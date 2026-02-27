@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VibeBrowser</title>
+    <link rel="stylesheet" href="vibe.css" />
+  </head>
+  <body>
+    <!-- Custom Titlebar -->
+    <div id="titlebar" class="titlebar">
+      <!-- Left Side: Navigation & Controls -->
+      <div class="titlebar-left">
+        <button id="back-btn" class="nav-btn" title="Back" onclick="window.electronAPI?.navigate?.back(window.app?.getActiveTabId())">◀</button>
+        <button id="forward-btn" class="nav-btn" title="Forward" onclick="window.electronAPI?.navigate?.forward(window.app?.getActiveTabId())">▶</button>
+        <button id="reload-btn" class="nav-btn" title="Reload" onclick="window.electronAPI?.navigate?.reload(window.app?.getActiveTabId())">↻</button>
+      </div>
+
+      <!-- Center: URL Bar -->
+      <div class="titlebar-center">
+        <input
+          type="text"
+          id="url-bar"
+          class="url-bar"
+          placeholder="Enter URL and press Enter..."
+        />
+        <div id="search-suggestions" class="search-suggestions hidden"></div>
+      </div>
+
+      <!-- Right Side: Toolbar + Window Controls -->
+      <div class="titlebar-right">
+        <div id="trust-radar" class="trust-radar" title="Trust Radar Score">Trust --</div>
+        <button id="bookmark-current-btn" class="toolbar-btn" title="Add bookmark (Ctrl+D)" onclick="window.app?.handleBookmarkCurrentPage()">
+          ★
+        </button>
+        <button id="bookmarks-btn" class="toolbar-btn" title="Bookmarks" onclick="window.app?.openBookmarksTab()">
+          📚
+        </button>
+        <button id="history-btn" class="toolbar-btn" title="History" onclick="window.app?.openHistoryTab()">
+          🕐
+        </button>
+        <button id="settings-btn" class="toolbar-btn" title="Settings" onclick="window.app?.openSettingsTab()">
+          ⚙
+        </button>
+        
+        <!-- Download Dropdown -->
+        <div id="download-dropdown-container" class="download-dropdown-container">
+          <button id="download-btn" class="toolbar-btn download-btn" title="Downloads" onclick="window.app?.toggleDownloadDropdown()">
+            📥
+            <span id="download-badge" class="download-badge hidden">0</span>
+          </button>
+          <div id="download-dropdown" class="download-dropdown hidden">
+            <div class="download-dropdown-header">
+              <h3>Downloads</h3>
+              <button id="clear-downloads-btn" class="download-clear-btn" onclick="window.app?.clearCompletedDownloads()" title="Clear completed">
+                🗑
+              </button>
+            </div>
+            <div id="download-list" class="download-list">
+              <p class="download-empty-message">No downloads</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="separator"></div>
+        <button id="minimize-btn" class="window-control minimize" title="Minimize" onclick="window.electronAPI?.window?.minimize()">
+          —
+        </button>
+        <button id="maximize-btn" class="window-control maximize" title="Maximize" onclick="window.electronAPI?.window?.maximize()">
+          ☐
+        </button>
+        <button id="close-btn" class="window-control close" title="Close" onclick="window.electronAPI?.window?.close()">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab-Bar -->
+    <div id="tab-bar" class="tab-bar">
+      <div id="tabs-container" class="tabs-container"></div>
+      <button id="new-tab-btn" class="new-tab-btn" title="Open new tab" onclick="window.app?.createNewTab()">
+        +
+      </button>
+    </div>
+
+    <!-- Browser Container (WebViews) -->
+    <div id="browser-container" class="browser-container"></div>
+
+    <!-- Bookmarks Sidebar -->
+    <div id="bookmarks-sidebar" class="sidebar sidebar-hidden">
+      <div class="sidebar-header">
+        <h2>Bookmarks</h2>
+        <button id="close-bookmarks-btn" class="close-sidebar-btn">✕</button>
+      </div>
+      <div class="sidebar-content">
+        <div id="bookmarks-list" class="bookmarks-list">
+          <p class="empty-message">No bookmarks available.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Sidebar -->
+    <div id="history-sidebar" class="sidebar sidebar-hidden">
+      <div class="sidebar-header">
+        <h2>History</h2>
+        <button id="close-history-btn" class="close-sidebar-btn">✕</button>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="history-search" placeholder="Search history..." />
+      </div>
+      <div class="sidebar-content">
+        <div id="history-list" class="history-list">
+          <p class="empty-message">No history available.</p>
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <button id="clear-history-btn" class="danger-btn">Clear history</button>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="panel panel-hidden">
+      <div class="panel-header">
+        <h2>Settings</h2>
+        <button id="close-settings-btn" class="close-panel-btn">✕</button>
+      </div>
+
+      <!-- Settings Tabs -->
+      <div class="settings-tabs">
+        <button class="settings-tab-btn active" data-tab="general">General</button>
+        <button class="settings-tab-btn" data-tab="themes">Themes</button>
+        <button class="settings-tab-btn" data-tab="adblock">Adblock</button>
+        <button class="settings-tab-btn" data-tab="advanced">Advanced</button>
+      </div>
+
+      <div class="panel-content">
+        <!-- General Tab -->
+        <div id="tab-general" class="settings-tab-content active">
+          <div class="settings-section">
+            <h3>Homepage</h3>
+            <input type="text" id="homepage-input" placeholder="https://www.google.com" />
+            <p class="setting-desc">URL loaded when a new tab is created</p>
+          </div>
+          <div class="settings-section">
+            <h3>Search engine</h3>
+            <select id="search-engine-select">
+              <option value="https://www.google.com/search?q=">Google</option>
+              <option value="https://www.bing.com/search?q=">Bing</option>
+              <option value="https://duckduckgo.com/?q=">DuckDuckGo</option>
+            </select>
+            <p class="setting-desc">Default search engine used in the URL bar</p>
+          </div>
+          <div class="settings-section">
+            <h3>Language</h3>
+            <select id="language-select">
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+            </select>
+            <p class="setting-desc">Choose UI language (English default)</p>
+          </div>
+        </div>
+
+        <!-- Themes Tab -->
+        <div id="tab-themes" class="settings-tab-content">
+          <div class="settings-section">
+            <h3>Select theme</h3>
+            <select id="theme-select">
+              <!-- Loaded dynamically -->
+            </select>
+            <p class="setting-desc">Additional themes can be created in Settings → Themes folder</p>
+          </div>
+          <div class="settings-section">
+            <button id="open-themes-folder-btn" class="secondary-btn">📂 Open themes folder</button>
+            <p class="setting-desc">Create custom themes with CSS (Discord/Vencord style)</p>
+          </div>
+          <div class="settings-section">
+            <h3>Theme preview</h3>
+            <div id="theme-preview" class="theme-preview">
+              <div style="padding: 10px; background: var(--bg-secondary); border-radius: 4px;">
+                <p style="color: var(--text-primary); margin: 0;">Primary text</p>
+                <p style="color: var(--text-secondary); margin: 5px 0 0 0;">Secondary text</p>
+              </div>
+              <div style="padding: 10px; margin-top: 10px; background: var(--accent); border-radius: 4px; color: var(--bg-primary);">
+                Accent color
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Adblock Tab -->
+        <div id="tab-adblock" class="settings-tab-content">
+          <div class="settings-section">
+            <h3>Adblock status</h3>
+            <div id="adblock-stats" style="background: var(--bg-secondary); padding: 10px; border-radius: 4px; margin: 10px 0;">
+              <span>Loading...</span>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>Custom blocking rule</h3>
+            <input type="text" id="adblock-rule-input" placeholder="e.g. ||example.com^ or @@||whitelist.com^" />
+            <button id="add-adblock-rule-btn" class="primary-btn" style="margin-top: 8px;">Add rule</button>
+            <p class="setting-desc">Start with @@ to create a whitelist rule</p>
+          </div>
+          <div class="settings-section">
+            <button id="reload-adblock-rules-btn" class="secondary-btn">🔄 Reload rules</button>
+            <button id="open-adblock-rules-btn" class="secondary-btn">📂 Open rules file</button>
+            <p class="setting-desc">Store and edit rules in adblock-custom.txt</p>
+          </div>
+        </div>
+
+        <!-- Advanced Tab -->
+        <div id="tab-advanced" class="settings-tab-content">
+          <div class="settings-section">
+            <h3>Storage location</h3>
+            <p>All data is stored locally in: <code>AppData\Roaming\VibeBrowser\</code></p>
+          </div>
+          <div class="settings-section">
+            <h3>Version info</h3>
+            <p id="version-info">VibeBrowser v1.2.1</p>
+          </div>
+          <div class="settings-section">
+            <button id="save-settings-btn" class="primary-btn">💾 Save settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Notification -->
+    <div id="update-notification" class="update-notification hidden">
+      <div class="notification-content">
+        <span id="notification-text">🎉 VibeBrowser was updated!</span>
+        <button id="changelog-btn" class="changelog-btn">View changelog</button>
+      </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div id="changelog-modal" class="modal hidden">
+      <div class="modal-overlay" id="changelog-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>📝 Changelog - VibeBrowser <span id="changelog-version">v1.2.1</span></h2>
+          <button id="close-changelog-btn" class="close-modal-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <iframe id="changelog-frame" src="changelog.html" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- Renderer-Skript -->
+    <script src="app.js"></script>
+  </body>
+</html>

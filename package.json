@@ -1,0 +1,77 @@
+{
+  "name": "vibebrowser",
+  "version": "1.2.1",
+  "description": "Ein moderner, anpassbarer Vibe-Browser mit Custom Themes, Adblock, Downloads, Sessions und mehr",
+  "main": "dist/main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "npm run build && electron .",
+    "dev": "npm run build:dev && electron . --enable-logging",
+    "build": "webpack --mode production && npm run copy:renderer",
+    "build:dev": "webpack --mode development && npm run copy:renderer",
+    "build:watch": "webpack --mode development --watch",
+    "copy:renderer": "node scripts/copy-renderer-assets.js",
+    "pack": "electron-builder --dir",
+    "dist": "npm run build && electron-builder --win --publish=never"
+  },
+  "keywords": [
+    "browser",
+    "electron",
+    "vibe"
+  ],
+  "author": "Maxim. K",
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "electron": "^27.0.0",
+    "electron-builder": "^26.8.1",
+    "electron-packager": "^17.1.2",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "build": {
+    "appId": "com.vibebrowser.app",
+    "productName": "VibeBrowser",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map",
+      "node_modules/electron-updater/**/*",
+      "package.json"
+    ],
+    "asarUnpack": false,
+    "asar": false,
+    "compression": "maximum",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VibeBrowser"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Maxilicious20",
+      "repo": "VibeBrowser"
+    }
+  }
+}

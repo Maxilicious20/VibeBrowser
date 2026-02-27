@@ -1,0 +1,11 @@
+/* VibeBrowser Custom CSS */
+/* Beispiel: Buttons runder machen */
+.toolbar-btn, .nav-btn, .window-control {
+  border-radius: 10px;
+}
+
+/* Beispiel: URL-Bar hervorheben */
+.url-bar {
+  border: 1px solid #89b4fa;
+  box-shadow: 0 0 10px rgba(137, 180, 250, 0.2);
+}

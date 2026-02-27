@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+!release/.gitkeep
+*.exe
+*.zip
+*.7z
+*.asar
+*.log
