@@ -68,6 +68,8 @@ export interface IpcChannels {
   CREATE_TAB: 'tab:create';
   CLOSE_TAB: 'tab:close';
   SWITCH_TAB: 'tab:switch';
+  SHOW_TAB_TOOLS_MENU: 'tab:show-tools-menu';
+  SET_UI_TOP_INSET: 'tab:set-ui-top-inset';
   UPDATE_TAB: 'tab:update';
   GET_TAB_INFO: 'tab:get-info';
   TAB_TITLE_CHANGED: 'tab:title-changed';
@@ -181,6 +183,8 @@ export const ipcChannels: IpcChannels = {
   CREATE_TAB: 'tab:create',
   CLOSE_TAB: 'tab:close',
   SWITCH_TAB: 'tab:switch',
+  SHOW_TAB_TOOLS_MENU: 'tab:show-tools-menu',
+  SET_UI_TOP_INSET: 'tab:set-ui-top-inset',
   UPDATE_TAB: 'tab:update',
   GET_TAB_INFO: 'tab:get-info',
   TAB_TITLE_CHANGED: 'tab:title-changed',

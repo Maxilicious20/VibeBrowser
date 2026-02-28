@@ -16,6 +16,9 @@ class VibeBrowserApp {
   private dragPlaceholder: HTMLElement | null = null;
   private downloadDropdown: HTMLElement | null = null;
   private downloadDropdownOpen: boolean = false;
+  private tabToolsDropdown: HTMLElement | null = null;
+  private tabToolsDropdownOpen: boolean = false;
+  private readonly dropdownTopInsetPx: number = 320;
   private downloads: Map<string, any> = new Map();
   private downloadListElement: HTMLElement | null = null;
   private downloadHandlersRegistered: boolean = false;
@@ -24,13 +27,17 @@ class VibeBrowserApp {
   // Bound handlers to prevent memory leaks
   private handleDownloadButtonClickBound: ((event: Event) => void) | null = null;
   private handleClickOutsideBound: ((event: MouseEvent) => void) | null = null;
+  private handleTabToolsClickOutsideBound: ((event: MouseEvent) => void) | null = null;
 
   // Debounce timers for performance
   private downloadListUpdateTimer: NodeJS.Timeout | null = null;
+  private downloadNotificationTimer: NodeJS.Timeout | null = null;
+  private lastAppliedBackgroundUrl: string = '';
   private lastFindQuery: string = '';
   private recentlyClosedTabs: Array<{ url: string; title: string }> = [];
   private trustRadarEnabled: boolean = true;
   private currentLanguage: 'en' | 'de' = 'en';
+  private iconMode: 'svg' | 'emoji' = 'svg';
 
   // UI Elements
   private bookmarksSidebar: HTMLElement;
@@ -73,6 +80,7 @@ class VibeBrowserApp {
     this.historySidebar = document.getElementById('history-sidebar') as HTMLElement;
     this.settingsPanel = document.getElementById('settings-panel') as HTMLElement;
     this.downloadDropdown = document.getElementById('download-dropdown');
+    this.tabToolsDropdown = document.getElementById('tab-tools-dropdown');
     this.loadTabGroupAssignments();
 
     this.setupCallbacks();
@@ -443,8 +451,13 @@ class VibeBrowserApp {
     if (window.electronAPI.downloads.onStarted) {
       window.electronAPI.downloads.onStarted((download: any) => {
         this.downloads.set(download.id, download);
+        this.openDownloadDropdown(true);
         this.scheduleDownloadListUpdate();
         this.updateDownloadBadge();
+        this.showDownloadNotification(
+          this.t('Download started', 'Download gestartet'),
+          download.filename
+        );
       });
     }
 
@@ -461,6 +474,10 @@ class VibeBrowserApp {
         this.downloads.set(download.id, download);
         this.scheduleDownloadListUpdate();
         this.updateDownloadBadge();
+        this.showDownloadNotification(
+          this.t('Download completed', 'Download abgeschlossen'),
+          download.filename
+        );
       });
     }
 
@@ -505,7 +522,7 @@ class VibeBrowserApp {
         const isOutsideButton = !downloadBtn?.contains(target);
 
         if (isOutsideDropdown && isOutsideButton) {
-          this.toggleDownloadDropdown();
+          this.closeDownloadDropdown();
         }
       };
 
@@ -515,23 +532,96 @@ class VibeBrowserApp {
   }
 
   /**
+   * Setup handler to close tab tools dropdown when clicking outside
+   */
+  private setupTabToolsDropdownCloseHandler(): void {
+    if (!this.handleTabToolsClickOutsideBound) {
+      this.handleTabToolsClickOutsideBound = (event: MouseEvent) => {
+        if (!this.tabToolsDropdown || !this.tabToolsDropdownOpen) return;
+
+        const tabToolsBtn = document.getElementById('tab-tools-btn');
+        const target = event.target as HTMLElement;
+
+        const isOutsideDropdown = !this.tabToolsDropdown.contains(target);
+        const isOutsideButton = !tabToolsBtn?.contains(target);
+
+        if (isOutsideDropdown && isOutsideButton) {
+          this.toggleTabToolsDropdown();
+        }
+      };
+
+      document.addEventListener('click', this.handleTabToolsClickOutsideBound);
+    }
+  }
+
+  /**
    * Toggle download dropdown visibility
    */
-  toggleDownloadDropdown(): void {
-    if (!this.downloadDropdown) {
-      console.error('[Downloads] Download dropdown element not found');
+  async toggleDownloadDropdown(): Promise<void> {
+    if (this.downloadDropdownOpen) {
+      this.closeDownloadDropdown();
       return;
     }
 
-    this.downloadDropdownOpen = !this.downloadDropdownOpen;
+    await this.openDownloadDropdown(true);
+  }
 
-    if (this.downloadDropdownOpen) {
-      this.downloadDropdown.classList.remove('hidden');
-      // Load downloads from main process
-      this.loadDownloads();
-    } else {
-      this.downloadDropdown.classList.add('hidden');
+  private async openDownloadDropdown(reload: boolean = false): Promise<void> {
+    if (!this.downloadDropdown) {
+      return;
     }
+
+    this.downloadDropdownOpen = true;
+    this.downloadDropdown.classList.remove('hidden');
+    this.syncBrowserViewTopInset();
+
+    if (reload) {
+      await this.loadDownloads();
+    } else {
+      this.updateDownloadsList();
+      this.updateDownloadBadge();
+    }
+  }
+
+  private closeDownloadDropdown(): void {
+    this.downloadDropdownOpen = false;
+    this.downloadDropdown?.classList.add('hidden');
+    this.syncBrowserViewTopInset();
+  }
+
+  public async toggleTabToolsDropdown(): Promise<void> {
+    if (this.downloadDropdownOpen) {
+      this.toggleDownloadDropdown();
+    }
+
+    const action = await window.electronAPI?.tabs?.showTabToolsMenu?.();
+    if (!action) {
+      return;
+    }
+
+    if (action === 'cycle-group') {
+      this.cycleCurrentTabGroup();
+      return;
+    }
+
+    if (action === 'switch-group') {
+      this.quickSwitchGroup();
+      return;
+    }
+
+    if (action === 'save-workspace') {
+      await this.saveWorkspaceSnapshot();
+      return;
+    }
+
+    if (action === 'switch-workspace') {
+      await this.switchWorkspace();
+    }
+  }
+
+  private syncBrowserViewTopInset(): void {
+    const inset = this.downloadDropdownOpen ? this.dropdownTopInsetPx : 0;
+    window.electronAPI?.tabs?.setUiTopInset?.(inset);
   }
 
   /**
@@ -555,12 +645,12 @@ class VibeBrowserApp {
   private updateDownloadsList(): void {
     const downloadList = document.getElementById('download-list');
     if (!downloadList) {
-      console.error('[Downloads] download-list element not found');
       return;
     }
 
     this.downloadListElement = downloadList;
-    const downloads = Array.from(this.downloads.values());
+    const downloads = Array.from(this.downloads.values())
+      .sort((a: any, b: any) => (b.startTime || 0) - (a.startTime || 0));
 
     if (downloads.length === 0) {
       downloadList.innerHTML = `<p class="download-empty-message">${this.t('No downloads', 'Keine Downloads')}</p>`;
@@ -612,7 +702,14 @@ class VibeBrowserApp {
       window.electronAPI!.downloads.resume(downloadId);
     } else if (button.classList.contains('cancel-btn')) {
       window.electronAPI!.downloads.cancel(downloadId);
-      this.downloads.delete(downloadId);
+      const current = this.downloads.get(downloadId);
+      if (current) {
+        this.downloads.set(downloadId, {
+          ...current,
+          state: 'cancelled',
+          paused: false,
+        });
+      }
       this.updateDownloadsList();
       this.updateDownloadBadge();
     } else if (button.classList.contains('open-btn')) {
@@ -633,17 +730,26 @@ class VibeBrowserApp {
     const sizeStr = this.formatBytes(download.totalBytes);
     const receivedStr = this.formatBytes(download.receivedBytes);
 
+    const statusLabel = this.getDownloadStatusLabel(download);
+    const safeName = this.escapeHtml(download.filename || this.t('Unknown file', 'Unbekannte Datei'));
+
     return `
       <div class="download-item" data-id="${download.id}">
         <div class="download-item-header">
-          <span class="download-item-name" title="${download.filename}">${download.filename}</span>
-          <span class="download-item-status ${download.state}">${download.state}</span>
+          <span class="download-item-name" title="${safeName}">${safeName}</span>
+          <span class="download-item-status ${download.state}">${statusLabel}</span>
         </div>
         ${
           download.state === 'progressing'
             ? `
+          <div class="download-item-loading-row">
+            <span class="download-loader" aria-hidden="true"></span>
+            <span class="download-loading-text">${this.t('Downloading…', 'Lade herunter…')}</span>
+          </div>
           <div class="download-item-progress">
-            <div class="download-item-progress-bar" style="width: ${percent}%"></div>
+            <div class="download-item-progress-bar" style="width: ${percent}%">
+              <span class="download-item-progress-shimmer" aria-hidden="true"></span>
+            </div>
           </div>
           <div class="download-item-info">
             <span class="download-item-size">${receivedStr} / ${sizeStr}</span>
@@ -661,28 +767,49 @@ class VibeBrowserApp {
           ${
             download.state === 'progressing'
               ? download.paused
-                ? `<button class="download-item-btn resume-btn" data-id="${download.id}">▶ Fortsetzen</button>`
-                : `<button class="download-item-btn pause-btn" data-id="${download.id}">⏸ Pausieren</button>`
+                ? `<button class="download-item-btn resume-btn" data-id="${download.id}">${this.t('Resume', 'Fortsetzen')}</button>`
+                : `<button class="download-item-btn pause-btn" data-id="${download.id}">${this.t('Pause', 'Pausieren')}</button>`
+              : ''
+          }
+          ${
+            download.state === 'interrupted' && download.canResume
+              ? `<button class="download-item-btn resume-btn" data-id="${download.id}">${this.t('Resume', 'Fortsetzen')}</button>`
               : ''
           }
           ${
             download.state === 'progressing'
-              ? `<button class="download-item-btn cancel-btn danger" data-id="${download.id}">✕ Abbrechen</button>`
+              ? `<button class="download-item-btn cancel-btn danger" data-id="${download.id}">${this.t('Cancel', 'Abbrechen')}</button>`
               : ''
           }
           ${
             download.state === 'completed'
-              ? `<button class="download-item-btn open-btn" data-id="${download.id}">▶ ${this.t('Open', 'Öffnen')}</button>`
+              ? `<button class="download-item-btn open-btn" data-id="${download.id}">${this.t('Open', 'Öffnen')}</button>`
               : ''
           }
           ${
             download.state === 'completed'
-              ? `<button class="download-item-btn folder-btn" data-id="${download.id}">📁 Ordner</button>`
+              ? `<button class="download-item-btn folder-btn" data-id="${download.id}">${this.t('Folder', 'Ordner')}</button>`
               : ''
           }
         </div>
       </div>
     `;
+  }
+
+  private getDownloadStatusLabel(download: any): string {
+    if (download.state === 'completed') {
+      return this.t('Completed', 'Abgeschlossen');
+    }
+    if (download.state === 'cancelled') {
+      return this.t('Cancelled', 'Abgebrochen');
+    }
+    if (download.state === 'interrupted') {
+      return this.t('Interrupted', 'Unterbrochen');
+    }
+    if (download.paused) {
+      return this.t('Paused', 'Pausiert');
+    }
+    return this.t('Downloading', 'Lädt');
   }
 
 
@@ -740,6 +867,24 @@ class VibeBrowserApp {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  }
+
+  private showDownloadNotification(title: string, filename: string): void {
+    const toast = document.getElementById('download-notification');
+    const text = document.getElementById('download-notification-text');
+    if (!toast || !text) return;
+
+    text.textContent = `${title}: ${filename}`;
+    toast.classList.remove('hidden');
+
+    if (this.downloadNotificationTimer) {
+      clearTimeout(this.downloadNotificationTimer);
+    }
+
+    this.downloadNotificationTimer = setTimeout(() => {
+      toast.classList.add('hidden');
+      this.downloadNotificationTimer = null;
+    }, 4500);
   }
 
   /**
@@ -902,6 +1047,17 @@ class VibeBrowserApp {
         const targetTab = allTabs[index - 1];
         this.tabManager.switchTab(targetTab.id);
         window.electronAPI!.tabs.switch(targetTab.id);
+      }
+    });
+
+    document.addEventListener('keydown', (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'j') {
+        event.preventDefault();
+        this.toggleDownloadDropdown();
+      }
+
+      if (event.key === 'Escape' && this.downloadDropdownOpen) {
+        this.closeDownloadDropdown();
       }
     });
   }
@@ -1371,6 +1527,17 @@ class VibeBrowserApp {
     changelogOverlay?.addEventListener('click', () => {
       this.hideChangelogModal();
     });
+
+    const downloadNotificationBtn = document.getElementById('download-notification-open-btn');
+    downloadNotificationBtn?.addEventListener('click', () => {
+      const toast = document.getElementById('download-notification');
+      if (!this.downloadDropdownOpen) {
+        this.toggleDownloadDropdown();
+      }
+      toast?.classList.add('hidden');
+    });
+
+    this.setupTabToolsDropdownCloseHandler();
     
   }
 
@@ -1610,10 +1777,12 @@ class VibeBrowserApp {
       const searchEngineSelect = document.getElementById('search-engine-select') as HTMLSelectElement;
       const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
       const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
+      const iconModeSelect = document.getElementById('icon-mode-select') as HTMLSelectElement;
 
       if (homepageInput) homepageInput.value = settings.homepage || 'https://www.google.com';
       if (searchEngineSelect) searchEngineSelect.value = settings.searchEngine || 'https://www.google.com/search?q=';
       if (languageSelect) languageSelect.value = settings.language || 'en';
+      if (iconModeSelect) iconModeSelect.value = settings.iconMode === 'emoji' ? 'emoji' : 'svg';
       
       // Load themes into dropdown
       await this.loadThemesList();
@@ -1758,6 +1927,7 @@ class VibeBrowserApp {
     try {
       const settings = await window.electronAPI!.settings.get();
       this.currentLanguage = settings.language === 'de' ? 'de' : 'en';
+      this.iconMode = settings.iconMode === 'emoji' ? 'emoji' : 'svg';
       const themeName = settings.theme || 'catppuccin-mocha';
 
       const themeCss = await window.electronAPI!.themes.load(themeName);
@@ -1785,6 +1955,7 @@ class VibeBrowserApp {
       }
 
       this.trustRadarEnabled = settings.trustRadarEnabled !== false;
+      this.applyIconMode(this.iconMode);
       this.applyLanguageToMainUI();
 
       const activeTabId = this.tabManager.getActiveTabId();
@@ -1798,8 +1969,34 @@ class VibeBrowserApp {
   }
 
   private applyCustomBackground(imageDataUrl: string): void {
-    const safeImageUrl = imageDataUrl.replace(/"/g, '%22');
+    const raw = (imageDataUrl || '').trim();
+    if (!raw) {
+      this.clearCustomBackground();
+      return;
+    }
+
+    const normalized =
+      raw.startsWith('data:') ||
+      raw.startsWith('http://') ||
+      raw.startsWith('https://') ||
+      raw.startsWith('file://')
+        ? raw
+        : `file://${raw.replace(/\\/g, '/')}`;
+
+    const safeImageUrl = normalized.replace(/"/g, '%22');
+    if (safeImageUrl === this.lastAppliedBackgroundUrl) {
+      return;
+    }
+
+    this.lastAppliedBackgroundUrl = safeImageUrl;
+    const html = document.documentElement;
     const body = document.body;
+    html.style.backgroundImage = `linear-gradient(rgba(17,17,27,0.55), rgba(17,17,27,0.55)), url("${safeImageUrl}")`;
+    html.style.backgroundSize = 'cover';
+    html.style.backgroundPosition = 'center';
+    html.style.backgroundRepeat = 'no-repeat';
+    html.style.backgroundAttachment = 'fixed';
+
     body.style.backgroundImage = `linear-gradient(rgba(17,17,27,0.55), rgba(17,17,27,0.55)), url("${safeImageUrl}")`;
     body.style.backgroundSize = 'cover';
     body.style.backgroundPosition = 'center';
@@ -1808,6 +2005,14 @@ class VibeBrowserApp {
   }
 
   private clearCustomBackground(): void {
+    this.lastAppliedBackgroundUrl = '';
+    const html = document.documentElement;
+    html.style.backgroundImage = '';
+    html.style.backgroundSize = '';
+    html.style.backgroundPosition = '';
+    html.style.backgroundRepeat = '';
+    html.style.backgroundAttachment = '';
+
     document.body.style.backgroundImage = '';
     document.body.style.backgroundSize = '';
     document.body.style.backgroundPosition = '';
@@ -1832,6 +2037,11 @@ class VibeBrowserApp {
     if (styleElement) {
       styleElement.remove();
     }
+  }
+
+  private applyIconMode(mode: 'svg' | 'emoji'): void {
+    document.body.classList.remove('icon-mode-svg', 'icon-mode-emoji');
+    document.body.classList.add(mode === 'emoji' ? 'icon-mode-emoji' : 'icon-mode-svg');
   }
 
   /**
@@ -2071,8 +2281,9 @@ class VibeBrowserApp {
       const searchEngineSelect = document.getElementById('search-engine-select') as HTMLSelectElement;
       const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
       const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
+      const iconModeSelect = document.getElementById('icon-mode-select') as HTMLSelectElement;
 
-      if (!homepageInput || !searchEngineSelect || !themeSelect || !languageSelect) {
+      if (!homepageInput || !searchEngineSelect || !themeSelect || !languageSelect || !iconModeSelect) {
         alert(this.t('Some settings elements could not be found.', 'Einige Einstellungs-Elemente konnten nicht gefunden werden.'));
         return;
       }
@@ -2081,6 +2292,7 @@ class VibeBrowserApp {
       const settings = {
         ...current,
         language: languageSelect.value === 'de' ? 'de' : 'en',
+        iconMode: iconModeSelect.value === 'emoji' ? 'emoji' : 'svg',
         homepage: homepageInput.value,
         searchEngine: searchEngineSelect.value,
         theme: themeSelect.value,

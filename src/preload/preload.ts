@@ -26,6 +26,8 @@ const electronAPI = {
     create: (url?: string) => ipcRenderer.invoke(ipcChannels.CREATE_TAB, url),
     close: (tabId: string) => ipcRenderer.send(ipcChannels.CLOSE_TAB, tabId),
     switch: (tabId: string) => ipcRenderer.send(ipcChannels.SWITCH_TAB, tabId),
+    showTabToolsMenu: () => ipcRenderer.invoke(ipcChannels.SHOW_TAB_TOOLS_MENU),
+    setUiTopInset: (insetPx: number) => ipcRenderer.send(ipcChannels.SET_UI_TOP_INSET, insetPx),
     getInfo: (tabId: string) => ipcRenderer.invoke(ipcChannels.GET_TAB_INFO, tabId),
     onUpdate: (callback: (tab: TabData) => void) =>
       ipcRenderer.on(ipcChannels.UPDATE_TAB, (_event, tab) => callback(tab)),
@@ -183,6 +185,8 @@ declare global {
         create: (url?: string) => Promise<{ tabId: string; url: string }>;
         close: (tabId: string) => void;
         switch: (tabId: string) => void;
+        showTabToolsMenu: () => Promise<'cycle-group' | 'switch-group' | 'save-workspace' | 'switch-workspace' | null>;
+        setUiTopInset: (insetPx: number) => void;
         getInfo: (tabId: string) => Promise<{ url: string; title: string }>;
         onUpdate: (callback: (tab: TabData) => void) => void;
         onTitleChanged: (callback: (tabId: string, title: string) => void) => void;

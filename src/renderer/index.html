@@ -6,7 +6,21 @@
     <title>VibeBrowser</title>
     <link rel="stylesheet" href="vibe.css" />
   </head>
-  <body>
+  <body class="icon-mode-svg">
+    <svg class="ui-icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3.5l2.7 5.47 6.04.88-4.37 4.26 1.03 6.01L12 17.3l-5.4 2.82 1.03-6.01-4.37-4.26 6.04-.88L12 3.5z"/></symbol>
+      <symbol id="icon-bookmarks" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3.2L6 20V4z"/></symbol>
+      <symbol id="icon-history" viewBox="0 0 24 24"><path d="M12 7v5l3 2"/><path d="M3 12a9 9 0 1 0 2.64-6.36"/><path d="M3 4v4h4"/></symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1V21a2 2 0 1 1-4 0v-.08a1.65 1.65 0 0 0-.4-1 1.65 1.65 0 0 0-1-.52 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.4H3a2 2 0 1 1 0-4h.08a1.65 1.65 0 0 0 1-.4 1.65 1.65 0 0 0 .52-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6c.4 0 .78-.15 1.06-.42.27-.28.42-.66.42-1.06V3a2 2 0 1 1 4 0v.08c0 .4.15.78.42 1.06.28.27.66.42 1.06.42.44 0 .87-.18 1.18-.49l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.31.31-.49.74-.49 1.18 0 .4.15.78.42 1.06.28.27.66.42 1.06.42H21a2 2 0 1 1 0 4h-.08c-.4 0-.78.15-1.06.42-.27.28-.42.66-.42 1.06z"/></symbol>
+      <symbol id="icon-puzzle" viewBox="0 0 24 24"><path d="M10 3h4v3a2 2 0 1 0 4 0V3h3v6h-3a2 2 0 1 1 0 4h3v8h-8v-3a2 2 0 1 0-4 0v3H3v-8h3a2 2 0 1 0 0-4H3V3h7z"/></symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v11"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5V3z"/><path d="M8 3v6h8V3"/><path d="M8 21v-6h8v6"/></symbol>
+      <symbol id="icon-note" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6V3z"/><path d="M15 3v6h6"/></symbol>
+      <symbol id="icon-party" viewBox="0 0 24 24"><path d="M4 20l7-3 3-7 6 6-7 3-3 7z"/><path d="M14 4l1 2"/><path d="M19 7l2 1"/><path d="M20 12h2"/></symbol>
+    </svg>
+
     <!-- Custom Titlebar -->
     <div id="titlebar" class="titlebar">
       <!-- Left Side: Navigation & Controls -->
@@ -31,41 +45,45 @@
       <div class="titlebar-right">
         <div id="trust-radar" class="trust-radar" title="Trust Radar Score">Trust --</div>
         <button id="bookmark-current-btn" class="toolbar-btn" title="Add bookmark (Ctrl+D)" onclick="window.app?.handleBookmarkCurrentPage()">
-          ★
+          <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-star"></use></svg></span>
+          <span class="ui-icon icon-emoji" aria-hidden="true">★</span>
         </button>
         <button id="bookmarks-btn" class="toolbar-btn" title="Bookmarks" onclick="window.app?.openBookmarksTab()">
-          📚
+          <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-bookmarks"></use></svg></span>
+          <span class="ui-icon icon-emoji" aria-hidden="true">📚</span>
         </button>
         <button id="history-btn" class="toolbar-btn" title="History" onclick="window.app?.openHistoryTab()">
-          🕐
+          <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-history"></use></svg></span>
+          <span class="ui-icon icon-emoji" aria-hidden="true">🕐</span>
         </button>
         <button id="settings-btn" class="toolbar-btn" title="Settings" onclick="window.app?.openSettingsTab()">
-          ⚙
+          <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-settings"></use></svg></span>
+          <span class="ui-icon icon-emoji" aria-hidden="true">⚙</span>
         </button>
-        <button id="tab-group-btn" class="toolbar-btn" title="Cycle tab group color" onclick="window.app?.cycleCurrentTabGroup()">
-          🎨
-        </button>
-        <button id="group-switch-btn" class="toolbar-btn" title="Quick switch group" onclick="window.app?.quickSwitchGroup()">
-          🧭
-        </button>
-        <button id="workspace-save-btn" class="toolbar-btn" title="Save workspace" onclick="window.app?.saveWorkspaceSnapshot()">
-          💾
-        </button>
-        <button id="workspace-switch-btn" class="toolbar-btn" title="Switch workspace" onclick="window.app?.switchWorkspace()">
-          🗂
-        </button>
+        <div id="tab-tools-dropdown-container" class="tab-tools-dropdown-container">
+          <button id="tab-tools-btn" class="toolbar-btn" title="Tab groups & workspaces" onclick="window.app?.toggleTabToolsDropdown()">
+            <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-puzzle"></use></svg></span>
+            <span class="ui-icon icon-emoji" aria-hidden="true">🧩</span>
+          </button>
+          <div id="tab-tools-dropdown" class="tab-tools-dropdown hidden"></div>
+        </div>
         
         <!-- Download Dropdown -->
         <div id="download-dropdown-container" class="download-dropdown-container">
           <button id="download-btn" class="toolbar-btn download-btn" title="Downloads" onclick="window.app?.toggleDownloadDropdown()">
-            📥
+            <span class="download-icon">
+              <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-download"></use></svg></span>
+              <span class="ui-icon icon-emoji" aria-hidden="true">📥</span>
+            </span>
+            <span class="download-label">DL</span>
             <span id="download-badge" class="download-badge hidden">0</span>
           </button>
           <div id="download-dropdown" class="download-dropdown hidden">
             <div class="download-dropdown-header">
               <h3>Downloads</h3>
               <button id="clear-downloads-btn" class="download-clear-btn" onclick="window.app?.clearCompletedDownloads()" title="Clear completed">
-                🗑
+                <span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M7 6l1 14h8l1-14"/></svg></span>
+                <span class="ui-icon icon-emoji" aria-hidden="true">🗑</span>
               </button>
             </div>
             <div id="download-list" class="download-list">
@@ -170,6 +188,14 @@
             </select>
             <p class="setting-desc">Choose UI language (English default)</p>
           </div>
+          <div class="settings-section">
+            <h3>Toolbar icons</h3>
+            <select id="icon-mode-select">
+              <option value="svg">SVG icons</option>
+              <option value="emoji">Emoji</option>
+            </select>
+            <p class="setting-desc">Choose between scalable SVG icons and emoji style</p>
+          </div>
         </div>
 
         <!-- Themes Tab -->
@@ -182,7 +208,7 @@
             <p class="setting-desc">Additional themes can be created in Settings → Themes folder</p>
           </div>
           <div class="settings-section">
-            <button id="open-themes-folder-btn" class="secondary-btn">📂 Open themes folder</button>
+            <button id="open-themes-folder-btn" class="secondary-btn"><span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-folder"></use></svg></span><span class="ui-icon icon-emoji" aria-hidden="true">📂</span><span>Open themes folder</span></button>
             <p class="setting-desc">Create custom themes with CSS (Discord/Vencord style)</p>
           </div>
           <div class="settings-section">
@@ -214,8 +240,8 @@
             <p class="setting-desc">Start with @@ to create a whitelist rule</p>
           </div>
           <div class="settings-section">
-            <button id="reload-adblock-rules-btn" class="secondary-btn">🔄 Reload rules</button>
-            <button id="open-adblock-rules-btn" class="secondary-btn">📂 Open rules file</button>
+            <button id="reload-adblock-rules-btn" class="secondary-btn"><span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-refresh"></use></svg></span><span class="ui-icon icon-emoji" aria-hidden="true">🔄</span><span>Reload rules</span></button>
+            <button id="open-adblock-rules-btn" class="secondary-btn"><span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-folder"></use></svg></span><span class="ui-icon icon-emoji" aria-hidden="true">📂</span><span>Open rules file</span></button>
             <p class="setting-desc">Store and edit rules in adblock-custom.txt</p>
           </div>
         </div>
@@ -228,10 +254,10 @@
           </div>
           <div class="settings-section">
             <h3>Version info</h3>
-            <p id="version-info">VibeBrowser v1.3.0</p>
+            <p id="version-info">VibeBrowser v1.4.0</p>
           </div>
           <div class="settings-section">
-            <button id="save-settings-btn" class="primary-btn">💾 Save settings</button>
+            <button id="save-settings-btn" class="primary-btn"><span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-save"></use></svg></span><span class="ui-icon icon-emoji" aria-hidden="true">💾</span><span>Save settings</span></button>
           </div>
         </div>
       </div>
@@ -240,9 +266,15 @@
     <!-- Update Notification -->
     <div id="update-notification" class="update-notification hidden">
       <div class="notification-content">
-        <span id="notification-text">🎉 VibeBrowser was updated!</span>
+        <span id="notification-text"><span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-party"></use></svg></span><span class="ui-icon icon-emoji" aria-hidden="true">🎉</span><span> VibeBrowser was updated!</span></span>
         <button id="changelog-btn" class="changelog-btn">View changelog</button>
       </div>
+    </div>
+
+    <!-- Download Notification -->
+    <div id="download-notification" class="download-notification hidden">
+      <span id="download-notification-text">Download started</span>
+      <button id="download-notification-open-btn" class="download-notification-btn">Open downloads</button>
     </div>
 
     <!-- Changelog Modal -->
@@ -250,7 +282,7 @@
       <div class="modal-overlay" id="changelog-overlay"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h2>📝 Changelog - VibeBrowser <span id="changelog-version">v1.3.0</span></h2>
+          <h2><span class="ui-icon icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-note"></use></svg></span><span class="ui-icon icon-emoji" aria-hidden="true">📝</span> Changelog - VibeBrowser <span id="changelog-version">v1.4.0</span></h2>
           <button id="close-changelog-btn" class="close-modal-btn">✕</button>
         </div>
         <div class="modal-body">

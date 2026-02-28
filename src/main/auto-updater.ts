@@ -15,6 +15,7 @@ export class AutoUpdateManager {
   private lastProgressEmitAt: number = 0;
   private lastProgressPercent: number = -1;
   private readonly forceDevUpdates: boolean = process.env.VIBE_FORCE_DEV_UPDATES === '1';
+  private lastCheckWasManual: boolean = false;
 
   private onCheckingForUpdate = () => {
     console.log('[AutoUpdater] Checking for updates...');
@@ -46,6 +47,19 @@ export class AutoUpdateManager {
 
   private onUpdateNotAvailable = (info: any) => {
     console.log('[AutoUpdater] No updates available. Current version:', info.version);
+
+    if (!this.lastCheckWasManual) {
+      return;
+    }
+
+    dialog.showMessageBox(this.mainWindow, {
+      type: 'info',
+      title: 'No update found',
+      message: `You are already on the latest version (${info.version}).`,
+      detail: 'No newer release is currently available on GitHub.',
+      buttons: ['OK'],
+      defaultId: 0,
+    });
   };
 
   private onDownloadProgress = (progressObj: any) => {
@@ -93,6 +107,20 @@ export class AutoUpdateManager {
 
   private onError = (error: any) => {
     console.error('[AutoUpdater] Error:', error);
+
+    if (!this.lastCheckWasManual) {
+      return;
+    }
+
+    const errorMessage = error?.message || String(error);
+    dialog.showMessageBox(this.mainWindow, {
+      type: 'error',
+      title: 'Update check failed',
+      message: 'Could not check for updates.',
+      detail: `${errorMessage}\n\nTip: Ensure the GitHub release is published and includes update metadata files.`,
+      buttons: ['OK'],
+      defaultId: 0,
+    });
   };
 
   constructor(mainWindow: BrowserWindow) {
@@ -115,12 +143,12 @@ export class AutoUpdateManager {
 
     // Check for updates on startup (after 3 seconds)
     setTimeout(() => {
-      this.checkForUpdates();
+      this.checkForUpdates(false);
     }, 3000);
 
     // Check for updates every 5 minutes
     this.updateCheckInterval = setInterval(() => {
-      this.checkForUpdates();
+      this.checkForUpdates(false);
     }, this.updateCheckIntervalMs);
 
     autoUpdater.on('checking-for-update', this.onCheckingForUpdate);
@@ -134,18 +162,51 @@ export class AutoUpdateManager {
   /**
    * Manually check for updates
    */
-  public checkForUpdates(): void {
+  public checkForUpdates(manual: boolean = false): void {
+    this.lastCheckWasManual = manual;
+
     if (process.env.NODE_ENV === 'development' && !this.forceDevUpdates) {
       console.log('[AutoUpdater] Skipping update check in development mode');
+
+      if (manual) {
+        dialog.showMessageBox(this.mainWindow, {
+          type: 'info',
+          title: 'Update check unavailable',
+          message: 'Manual update check is disabled in development mode.',
+          detail: 'Use a packaged build or set VIBE_FORCE_DEV_UPDATES=1 for local testing.',
+          buttons: ['OK'],
+          defaultId: 0,
+        });
+      }
       return;
     }
 
     if (!app.isPackaged && !this.forceDevUpdates) {
       console.log('[AutoUpdater] Skipping update check because app is not packaged');
+
+      if (manual) {
+        dialog.showMessageBox(this.mainWindow, {
+          type: 'info',
+          title: 'Update check unavailable',
+          message: 'Manual update check works only in packaged builds.',
+          detail: 'Start the installed .exe to test update checks.',
+          buttons: ['OK'],
+          defaultId: 0,
+        });
+      }
       return;
     }
 
     if (this.isCheckingForUpdates) {
+      if (manual) {
+        dialog.showMessageBox(this.mainWindow, {
+          type: 'info',
+          title: 'Update check in progress',
+          message: 'An update check is already running.',
+          buttons: ['OK'],
+          defaultId: 0,
+        });
+      }
       return;
     }
 

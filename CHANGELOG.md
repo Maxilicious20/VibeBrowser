@@ -2,6 +2,78 @@
 
 Alle wichtigen Änderungen des Projekts sind in dieser Datei dokumentiert.
 
+## [1.4.0] - 2026-02-28 (Pre-Release)
+
+### ✨ Highlights
+
+#### 📥 Download Center Upgrade
+- Download-Dropdown öffnet jetzt automatisch, sobald ein neuer Download startet
+- Live-Status direkt im Dropdown (inkl. Pause/Fortsetzen/Abbrechen/Öffnen/Ordner)
+- Neue animierte Progress-Bar mit Shimmer-Effekt und aktiver Ladeanimation
+- Downloadliste nach neuesten Downloads sortiert
+
+#### 🧰 Right-Click Productivity Menu
+- Neues Kontextmenü auf Webseiten via Rechtsklick
+- Enthält Navigation, Copy/Paste, Inspect Element und Page DevTools
+- Bild-spezifische Aktionen ergänzt: Bild öffnen und Bild herunterladen
+
+#### 🎨 Icon System (SVG ↔ Emoji)
+- Toolbar- und Settings-Icons auf skalierbare SVGs umgestellt
+- Neue Option in den Settings: Zwischen SVG-Icons und Emojis umschalten
+
+### 🐛 Bug Fixes
+- Weißer Bereich unter der Toolbar bei Download-Overlay entschärft (Browser-Container nutzt Theme-Hintergrund)
+- Download-Cancel-Status bleibt sichtbar statt sofort aus der Liste zu verschwinden
+- Download-Titel im Dropdown sicher escaped (UI-Härtung)
+
+### ⚡ Quality of Life
+- `Ctrl+J` öffnet/schließt Download-Dropdown
+- `Esc` schließt das Download-Dropdown sofort
+
+### 📋 Technical Changes
+- `src/renderer/app.ts`
+- `src/renderer/index.html`
+- `src/styles/vibe.css`
+- `src/main/browser-view.ts`
+- `src/main/storage.ts`
+- `src/main/ipc/handlers.ts`
+- `src/preload/preload.ts`
+- `src/common/types.ts`
+- `package.json`
+- `package-lock.json`
+
+## [1.3.1] - 2026-02-28
+
+### 📋 What's Included in This Release
+
+### ✨ Improvements
+
+#### 🧩 Tab Groups & Workspaces UX
+- Alle Tab-Gruppen/Workspace-Aktionen in ein einziges Toolbar-Icon mit Dropdown zusammengeführt
+- Funktionen bleiben gleich, die Toolbar ist aber deutlich aufgeräumter
+- Klick-außerhalb-Verhalten für das neue Menü ergänzt
+
+#### 📥 Downloads UX
+- Download-Menü in der Toolbar weiter stabilisiert und immer erreichbar gehalten
+- Neue Download-Benachrichtigung unten rechts zeigt Start/Abschluss und öffnet direkt das Download-Menü
+
+### 🐛 Bug Fixes
+
+#### Critical Fixes
+✅ Überschneidungen zwischen Toolbar-Dropdowns behoben (Download/Tab-Tools schließen sich gegenseitig sauber)
+✅ Dropdown-Zustände im Renderer robuster gemacht
+
+#### Important Fixes
+✅ Priorisierung der Toolbar-Elemente auf kleineren Breiten verbessert, ohne Downloads auszublenden
+
+### 📋 Technical Changes
+
+#### Updated Files
+- `src/renderer/index.html`
+- `src/renderer/app.ts`
+- `src/styles/vibe.css`
+- `CHANGELOG.md`
+
 ## [1.3.0] - 2026-02-28
 
 ### 📋 What's Included in This Release

@@ -3,7 +3,7 @@
  * Diese Datei verwaltet die Kommunikation zwischen Renderer und Main Process
  */
 
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, Menu } from 'electron';
 import { ipcChannels } from '../../common/types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -102,6 +102,36 @@ export class IpcHandlerManager {
 
     ipcMain.on(ipcChannels.SWITCH_TAB, (_event, tabId: string) => {
       this.browserViewManager.activateTab(tabId);
+    });
+
+    ipcMain.handle(ipcChannels.SHOW_TAB_TOOLS_MENU, () => {
+      return new Promise<'cycle-group' | 'switch-group' | 'save-workspace' | 'switch-workspace' | null>((resolve) => {
+        let resolved = false;
+        const finish = (value: 'cycle-group' | 'switch-group' | 'save-workspace' | 'switch-workspace' | null) => {
+          if (resolved) {
+            return;
+          }
+          resolved = true;
+          resolve(value);
+        };
+
+        const menu = Menu.buildFromTemplate([
+          { label: 'Cycle tab group', click: () => finish('cycle-group') },
+          { label: 'Switch group', click: () => finish('switch-group') },
+          { type: 'separator' },
+          { label: 'Save workspace', click: () => finish('save-workspace') },
+          { label: 'Switch workspace', click: () => finish('switch-workspace') },
+        ]);
+
+        menu.popup({
+          window: this.mainWindow,
+          callback: () => finish(null),
+        });
+      });
+    });
+
+    ipcMain.on(ipcChannels.SET_UI_TOP_INSET, (_event, insetPx: number) => {
+      this.browserViewManager.setUiTopInset(insetPx);
     });
 
     ipcMain.handle(ipcChannels.GET_TAB_INFO, (_event, tabId: string) => {
@@ -348,20 +378,20 @@ export class IpcHandlerManager {
         if (fs.existsSync(packageDataPath)) {
           const packageData = JSON.parse(fs.readFileSync(packageDataPath, 'utf-8'));
           return {
-            version: packageData.version || '1.3.0',
+            version: packageData.version || '1.4.0',
             githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
           };
         }
         
         // Fallback
         return {
-          version: '1.3.0',
+          version: '1.4.0',
           githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
         };
       } catch (error) {
         console.error('Error reading app info:', error);
         return {
-          version: '1.3.0',
+          version: '1.4.0',
           githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
         };
       }

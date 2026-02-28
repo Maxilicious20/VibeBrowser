@@ -29,6 +29,7 @@ export interface Bookmark {
 
 export interface AppSettings {
   language?: 'en' | 'de';
+  iconMode?: 'svg' | 'emoji';
   dataSaverEnabled?: boolean;
   homepage: string;
   searchEngine: string;
@@ -66,6 +67,7 @@ export class StorageManager {
   private createDefaultSettings(): AppSettings {
     return {
       language: 'en',
+      iconMode: 'svg',
       dataSaverEnabled: false,
       homepage: 'https://www.google.com',
       searchEngine: 'https://www.google.com/search?q=',
@@ -76,7 +78,7 @@ export class StorageManager {
       customBackgroundImage: '',
       editorModeCss: '',
       trustRadarEnabled: true,
-      lastSeenVersion: '1.3.0',
+      lastSeenVersion: '1.4.0',
       privateMode: false,
       splitViewEnabled: false,
       splitOrientation: 'vertical',
@@ -302,6 +304,7 @@ export class StorageManager {
       const normalizedSearch = this.normalizeSearchEngine(parsed.searchEngine);
       return {
         language: parsed.language === 'de' ? 'de' : 'en',
+        iconMode: parsed.iconMode === 'emoji' ? 'emoji' : 'svg',
         homepage: parsed.homepage || 'https://www.google.com',
         searchEngine: normalizedSearch || 'https://www.google.com/search?q=',
         theme: parsed.theme || 'catppuccin-mocha',

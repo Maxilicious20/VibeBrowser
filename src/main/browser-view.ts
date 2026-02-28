@@ -3,7 +3,7 @@
  * Jeder Tab bekommt seine eigenen Browser-Prozess mit vollständiger Rendering-Engine
  */
 
-import { BrowserView, BrowserWindow, net } from 'electron';
+import { BrowserView, BrowserWindow, Menu, clipboard, net, MenuItemConstructorOptions } from 'electron';
 import { ipcChannels } from '../common/types';
 import { StorageManager } from './storage';
 import { AdblockManager } from './adblock-manager';
@@ -44,6 +44,7 @@ export class BrowserViewLifecycleManager {
     blockedByType: {},
   };
   private networkInterceptionInitialized: boolean = false;
+  private uiTopInsetPx: number = 0;
 
   constructor(
     mainWindow: BrowserWindow,
@@ -153,11 +154,12 @@ export class BrowserViewLifecycleManager {
         return callback({ cancel: false });
       }
 
-      const shouldBlockByAdblock = this.adblockEnabled && this.adblockManager.shouldBlockURL(url);
+      const adblockHit = this.adblockManager.shouldBlockURL(url);
+      const shouldBlockByAdblock = this.adblockEnabled && adblockHit;
 
       const resourceType = details.resourceType || 'unknown';
       const heavyType = resourceType === 'image' || resourceType === 'media' || resourceType === 'font';
-      const shouldBlockByDataSaver = this.dataSaverEnabled && (heavyType || this.adblockManager.shouldBlockURL(url));
+      const shouldBlockByDataSaver = this.dataSaverEnabled && (heavyType || adblockHit);
 
       const cancel = shouldBlockByAdblock || shouldBlockByDataSaver;
 
@@ -373,6 +375,18 @@ export class BrowserViewLifecycleManager {
     });
   }
 
+  setUiTopInset(insetPx: number): void {
+    const clamped = Math.max(0, Math.min(420, Math.floor(Number(insetPx) || 0)));
+    if (clamped === this.uiTopInsetPx) {
+      return;
+    }
+
+    this.uiTopInsetPx = clamped;
+    this.views.forEach((instance) => {
+      instance.view.setBounds(this.calculateViewBounds());
+    });
+  }
+
   /**
    * Berechnet die Bounds für BrowserView basierend auf Window-Größe
    * Muss Titlebar (40px) und Tab-Bar Platz lassen
@@ -381,13 +395,13 @@ export class BrowserViewLifecycleManager {
     const { width, height } = this.mainWindow.getContentBounds();
     const titlebarHeight = 40; // Custom Titlebar
     const tabbarHeight = 45; // Tab-Bar
-    const topOffset = titlebarHeight + tabbarHeight;
+    const topOffset = titlebarHeight + tabbarHeight + this.uiTopInsetPx;
 
     return {
       x: 0,
       y: topOffset,
       width,
-      height: height - topOffset,
+      height: Math.max(0, height - topOffset),
     };
   }
 
@@ -582,6 +596,80 @@ export class BrowserViewLifecycleManager {
     view.webContents.setWindowOpenHandler(({ url }) => {
       console.log(`Popup blocked: ${url}`);
       return { action: 'deny' };
+    });
+
+    view.webContents.on('context-menu', (_event, params) => {
+      const template: MenuItemConstructorOptions[] = [
+        {
+          label: 'Back',
+          enabled: view.webContents.canGoBack(),
+          click: () => view.webContents.goBack(),
+        },
+        {
+          label: 'Forward',
+          enabled: view.webContents.canGoForward(),
+          click: () => view.webContents.goForward(),
+        },
+        {
+          label: 'Reload',
+          click: () => view.webContents.reload(),
+        },
+        { type: 'separator' },
+        { role: 'copy' },
+        { role: 'paste' },
+      ];
+
+      if (params.linkURL) {
+        template.push(
+          { type: 'separator' },
+          {
+            label: 'Copy link address',
+            click: () => {
+              clipboard.writeText(params.linkURL);
+            },
+          }
+        );
+      }
+
+      if (params.mediaType === 'image' && params.srcURL) {
+        template.push(
+          { type: 'separator' },
+          {
+            label: 'Open image',
+            click: () => {
+              view.webContents.loadURL(params.srcURL);
+            },
+          },
+          {
+            label: 'Download image',
+            click: () => {
+              view.webContents.downloadURL(params.srcURL);
+            },
+          }
+        );
+      }
+
+      template.push(
+        { type: 'separator' },
+        {
+          label: 'Inspect element',
+          click: () => {
+            if (!view.webContents.isDevToolsOpened()) {
+              view.webContents.openDevTools({ mode: 'detach' });
+            }
+            view.webContents.inspectElement(params.x, params.y);
+          },
+        },
+        {
+          label: 'Open page DevTools',
+          click: () => {
+            view.webContents.openDevTools({ mode: 'detach' });
+          },
+        }
+      );
+
+      const menu = Menu.buildFromTemplate(template);
+      menu.popup({ window: this.mainWindow });
     });
   }
 

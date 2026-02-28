@@ -167,7 +167,7 @@ export class AppWindow {
    */
   checkForUpdates() {
     if (this.autoUpdateManager) {
-      this.autoUpdateManager.checkForUpdates();
+      this.autoUpdateManager.checkForUpdates(true);
     }
   }
 }

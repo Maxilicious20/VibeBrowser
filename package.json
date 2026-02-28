@@ -1,6 +1,6 @@
 {
   "name": "vibebrowser",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Ein moderner, anpassbarer Vibe-Browser mit Custom Themes, Adblock, Downloads, Sessions und mehr",
   "main": "dist/main.js",
   "homepage": "./",
