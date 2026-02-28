@@ -82,6 +82,7 @@ export class AppWindow {
     );
     const settings = this.storageManager.loadSettings();
     this.browserViewManager.setAdblockEnabled(settings.adblockEnabled ?? true);
+    this.browserViewManager.setDataSaverEnabled(settings.dataSaverEnabled ?? false);
     this.ipcManager = new IpcHandlerManager(
       this.mainWindow,
       this.browserViewManager,

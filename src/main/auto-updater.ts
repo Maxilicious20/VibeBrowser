@@ -4,7 +4,7 @@
  */
 
 import { autoUpdater } from 'electron-updater';
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow, dialog, app } from 'electron';
 
 export class AutoUpdateManager {
   private mainWindow: BrowserWindow;
@@ -14,6 +14,7 @@ export class AutoUpdateManager {
   private isCheckingForUpdates: boolean = false;
   private lastProgressEmitAt: number = 0;
   private lastProgressPercent: number = -1;
+  private readonly forceDevUpdates: boolean = process.env.VIBE_FORCE_DEV_UPDATES === '1';
 
   private onCheckingForUpdate = () => {
     console.log('[AutoUpdater] Checking for updates...');
@@ -107,6 +108,11 @@ export class AutoUpdateManager {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
 
+    if (this.forceDevUpdates) {
+      autoUpdater.forceDevUpdateConfig = true;
+      console.log('[AutoUpdater] Dev update checks are forced (VIBE_FORCE_DEV_UPDATES=1)');
+    }
+
     // Check for updates on startup (after 3 seconds)
     setTimeout(() => {
       this.checkForUpdates();
@@ -129,8 +135,13 @@ export class AutoUpdateManager {
    * Manually check for updates
    */
   public checkForUpdates(): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' && !this.forceDevUpdates) {
       console.log('[AutoUpdater] Skipping update check in development mode');
+      return;
+    }
+
+    if (!app.isPackaged && !this.forceDevUpdates) {
+      console.log('[AutoUpdater] Skipping update check because app is not packaged');
       return;
     }
 

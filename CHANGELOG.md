@@ -85,6 +85,12 @@ Alle wichtigen Änderungen des Projekts sind in dieser Datei dokumentiert.
 - Update-Dialog unterstützt „in 5 Minuten erinnern“
 - Manueller „Check for updates now“-Flow in den Einstellungen
 
+#### 🔔 Auto-Update Verhalten (für Nutzer auf v1.2.0)
+- v1.2.0 prüft automatisch beim Start und danach alle 5 Minuten auf neue Versionen
+- Wenn eine neuere Version (z. B. v1.2.1) verfügbar ist, erscheint ein „Update verfügbar“-Dialog
+- Nutzer können direkt herunterladen, später erinnern oder Update verschieben
+- Nach Download erscheint „Update bereit“ mit Neustart-Option
+
 #### 🔎 Browser Productivity Features
 - Trust Radar Score in der Toolbar (Heuristik auf URL/Host/Protokoll)
 - Reopen Closed Tab via `Ctrl+Shift+T`

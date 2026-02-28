@@ -62,6 +62,9 @@ const electronAPI = {
   settings: {
     get: () => ipcRenderer.invoke(ipcChannels.GET_SETTINGS),
     save: (settings: any) => ipcRenderer.invoke(ipcChannels.SAVE_SETTINGS, settings),
+    resetToDefaults: () => ipcRenderer.invoke(ipcChannels.RESET_SETTINGS_DEFAULTS),
+    exportUserData: () => ipcRenderer.invoke(ipcChannels.EXPORT_USER_DATA),
+    importUserData: () => ipcRenderer.invoke(ipcChannels.IMPORT_USER_DATA),
     notifyUpdated: () => ipcRenderer.send(ipcChannels.SETTINGS_UPDATED),
     onUpdated: (callback: () => void) => ipcRenderer.on(ipcChannels.SETTINGS_UPDATED, callback),
   },
@@ -122,6 +125,14 @@ const electronAPI = {
     onCompleted: (callback: (download: any) => void) =>
       ipcRenderer.on(ipcChannels.DOWNLOAD_COMPLETED, (_event, download) => callback(download)),
   },
+  sessions: {
+    save: (name: string, tabs: Array<{ url: string; title: string }>) =>
+      ipcRenderer.invoke(ipcChannels.SAVE_SESSION, name, tabs),
+    load: (sessionId: string) => ipcRenderer.invoke(ipcChannels.LOAD_SESSION, sessionId),
+    getAll: () => ipcRenderer.invoke(ipcChannels.GET_SESSIONS),
+    delete: (sessionId: string) => ipcRenderer.invoke(ipcChannels.DELETE_SESSION, sessionId),
+    restore: (sessionId: string) => ipcRenderer.invoke(ipcChannels.RESTORE_SESSION, sessionId),
+  },
   shortcuts: {
     onNewTab: (callback: () => void) => ipcRenderer.on('shortcut:new-tab', callback),
     onCloseTab: (callback: () => void) => ipcRenderer.on('shortcut:close-tab', callback),
@@ -145,6 +156,9 @@ const electronAPI = {
   },
   app: {
     getInfo: () => ipcRenderer.invoke(ipcChannels.GET_APP_INFO),
+  },
+  dataSaver: {
+    getStats: () => ipcRenderer.invoke(ipcChannels.GET_DATA_SAVER_STATS),
   },
 };
 
@@ -190,6 +204,9 @@ declare global {
       settings: {
         get: () => Promise<any>;
         save: (settings: any) => Promise<{ success: boolean }>;
+        resetToDefaults: () => Promise<{ success: boolean }>;
+        exportUserData: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>;
+        importUserData: () => Promise<{ success: boolean; cancelled?: boolean; error?: string }>;
         notifyUpdated: () => void;
         onUpdated: (callback: () => void) => void;
       };
@@ -246,6 +263,13 @@ declare global {
         onProgress?: (callback: (download: any) => void) => void;
         onCompleted?: (callback: (download: any) => void) => void;
       };
+      sessions: {
+        save: (name: string, tabs: Array<{ url: string; title: string }>) => Promise<any>;
+        load: (sessionId: string) => Promise<any>;
+        getAll: () => Promise<any[]>;
+        delete: (sessionId: string) => Promise<boolean>;
+        restore: (sessionId: string) => Promise<any>;
+      };
       shortcuts: {
         onNewTab: (callback: () => void) => void;
         onCloseTab: (callback: () => void) => void;
@@ -268,6 +292,16 @@ declare global {
       };
       app: {
         getInfo: () => Promise<{ version: string; githubRepo: string }>;
+      };
+      dataSaver: {
+        getStats: () => Promise<{
+          enabled: boolean;
+          allowedRequests: number;
+          blockedRequests: number;
+          estimatedSavedBytes: number;
+          estimatedTransferredBytes: number;
+          blockedByType: Record<string, number>;
+        }>;
       };
     };
   }

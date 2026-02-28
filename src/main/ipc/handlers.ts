@@ -5,6 +5,8 @@
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { ipcChannels } from '../../common/types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { BrowserViewLifecycleManager } from '../browser-view';
 import { StorageManager } from '../storage';
@@ -150,8 +152,67 @@ export class IpcHandlerManager {
     ipcMain.handle(ipcChannels.SAVE_SETTINGS, (_event, settings) => {
       this.storageManager.saveSettings(settings);
       this.browserViewManager.setAdblockEnabled(settings.adblockEnabled ?? true);
+      this.browserViewManager.setDataSaverEnabled(settings.dataSaverEnabled ?? false);
       this.mainWindow.webContents.send(ipcChannels.SETTINGS_UPDATED);
       return { success: true };
+    });
+
+    ipcMain.handle(ipcChannels.RESET_SETTINGS_DEFAULTS, () => {
+      this.storageManager.resetSettingsToDefaults();
+      this.browserViewManager.setAdblockEnabled(true);
+      this.browserViewManager.setDataSaverEnabled(false);
+      this.mainWindow.webContents.send(ipcChannels.SETTINGS_UPDATED);
+      return { success: true };
+    });
+
+    ipcMain.handle(ipcChannels.EXPORT_USER_DATA, async () => {
+      const { dialog } = require('electron');
+      const suggestedName = `vibebrowser-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const { canceled, filePath } = await dialog.showSaveDialog(this.mainWindow, {
+        title: 'Export VibeBrowser data',
+        defaultPath: path.join(process.cwd(), suggestedName),
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      });
+
+      if (canceled || !filePath) {
+        return { success: false, cancelled: true };
+      }
+
+      try {
+        const payload = this.storageManager.exportUserData();
+        fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+        return { success: true, path: filePath };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle(ipcChannels.IMPORT_USER_DATA, async () => {
+      const { dialog } = require('electron');
+      const { canceled, filePaths } = await dialog.showOpenDialog(this.mainWindow, {
+        title: 'Import VibeBrowser data',
+        properties: ['openFile'],
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      });
+
+      if (canceled || filePaths.length === 0) {
+        return { success: false, cancelled: true };
+      }
+
+      try {
+        const fileContent = fs.readFileSync(filePaths[0], 'utf-8');
+        const parsed = JSON.parse(fileContent);
+        this.storageManager.importUserData(parsed);
+
+        const newSettings = this.storageManager.loadSettings();
+        this.browserViewManager.setAdblockEnabled(newSettings.adblockEnabled ?? true);
+        this.browserViewManager.setDataSaverEnabled(newSettings.dataSaverEnabled ?? false);
+        this.mainWindow.webContents.send(ipcChannels.SETTINGS_UPDATED);
+
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
     });
 
     ipcMain.on(ipcChannels.SETTINGS_UPDATED, () => {
@@ -304,6 +365,10 @@ export class IpcHandlerManager {
           githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
         };
       }
+    });
+
+    ipcMain.handle(ipcChannels.GET_DATA_SAVER_STATS, () => {
+      return this.browserViewManager.getDataSaverStats();
     });
 
     // Downloads

@@ -80,14 +80,23 @@ body {
 
 .titlebar-center {
   flex: 1 1 auto;
-  min-width: 200px;
+  min-width: 160px;
   position: relative;
 }
 
 .titlebar-right {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   gap: 2px;
-  overflow: hidden;
+  overflow: visible;
+}
+
+@media (max-width: 1280px) {
+  #tab-group-btn,
+  #group-switch-btn,
+  #workspace-save-btn,
+  #workspace-switch-btn {
+    display: none;
+  }
 }
 
 /* Navigation Buttons */

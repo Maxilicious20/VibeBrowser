@@ -98,6 +98,9 @@ export interface IpcChannels {
   GET_SETTINGS: 'settings:get';
   SAVE_SETTINGS: 'settings:save';
   SETTINGS_UPDATED: 'settings:updated';
+  RESET_SETTINGS_DEFAULTS: 'settings:reset-defaults';
+  EXPORT_USER_DATA: 'settings:export-user-data';
+  IMPORT_USER_DATA: 'settings:import-user-data';
 
   // Custom CSS
   GET_CUSTOM_CSS: 'custom-css:get';
@@ -165,6 +168,9 @@ export interface IpcChannels {
 
   // App Info
   GET_APP_INFO: 'app:get-app-info';
+
+  // Data Saver
+  GET_DATA_SAVER_STATS: 'data-saver:get-stats';
 }
 
 export const ipcChannels: IpcChannels = {
@@ -197,6 +203,9 @@ export const ipcChannels: IpcChannels = {
   GET_SETTINGS: 'settings:get',
   SAVE_SETTINGS: 'settings:save',
   SETTINGS_UPDATED: 'settings:updated',
+  RESET_SETTINGS_DEFAULTS: 'settings:reset-defaults',
+  EXPORT_USER_DATA: 'settings:export-user-data',
+  IMPORT_USER_DATA: 'settings:import-user-data',
   GET_CUSTOM_CSS: 'custom-css:get',
   GET_CUSTOM_CSS_PATH: 'custom-css:get-path',
   OPEN_CUSTOM_CSS: 'custom-css:open',
@@ -240,6 +249,7 @@ export const ipcChannels: IpcChannels = {
   FIND_IN_PAGE: 'find:in-page',
   STOP_FIND_IN_PAGE: 'find:stop',
   GET_APP_INFO: 'app:get-app-info',
+  GET_DATA_SAVER_STATS: 'data-saver:get-stats',
 };
 
 export interface AppInfo {

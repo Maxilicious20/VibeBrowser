@@ -46,6 +46,16 @@ class VibeBrowserApp {
   private keyboardShortcutsSetup: boolean = false;
   private windowDropZoneSetup: boolean = false;
   private eventListenersSetup: boolean = false;
+  private isCreatingNewTab: boolean = false;
+  private isOpeningOfflineTab: boolean = false;
+  private tabGroupAssignments: Record<string, string> = {};
+  private readonly tabGroupStorageKey = 'vibebrowser-tab-groups-v1';
+  private readonly tabGroupPalette: Record<string, { color: string; label: string }> = {
+    work: { color: '#f38ba8', label: 'Work' },
+    study: { color: '#89b4fa', label: 'Study' },
+    fun: { color: '#a6e3a1', label: 'Fun' },
+    media: { color: '#f9e2af', label: 'Media' },
+  };
 
   constructor() {
     this.tabManager = new TabManager();
@@ -63,6 +73,7 @@ class VibeBrowserApp {
     this.historySidebar = document.getElementById('history-sidebar') as HTMLElement;
     this.settingsPanel = document.getElementById('settings-panel') as HTMLElement;
     this.downloadDropdown = document.getElementById('download-dropdown');
+    this.loadTabGroupAssignments();
 
     this.setupCallbacks();
     this.setupEventListeners();
@@ -81,6 +92,58 @@ class VibeBrowserApp {
 
     // Apply theme and custom CSS on startup
     this.applyAppearanceSettings();
+  }
+
+  private loadTabGroupAssignments(): void {
+    try {
+      const raw = localStorage.getItem(this.tabGroupStorageKey);
+      if (!raw) {
+        this.tabGroupAssignments = {};
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      this.tabGroupAssignments = typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch {
+      this.tabGroupAssignments = {};
+    }
+  }
+
+  private saveTabGroupAssignments(): void {
+    localStorage.setItem(this.tabGroupStorageKey, JSON.stringify(this.tabGroupAssignments));
+  }
+
+  private getHostFromUrl(url: string): string | null {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.hostname.toLowerCase();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private getTabGroupForUrl(url: string): string | null {
+    const host = this.getHostFromUrl(url);
+    if (!host) return null;
+    return this.tabGroupAssignments[host] || null;
+  }
+
+  private applyTabGroupStyle(tab: TabData): void {
+    const tabElement = document.getElementById(`ui-${tab.id}`);
+    if (!tabElement) return;
+
+    const groupId = this.getTabGroupForUrl(tab.url);
+    if (!groupId || !this.tabGroupPalette[groupId]) {
+      tabElement.style.borderTop = '';
+      return;
+    }
+
+    const group = this.tabGroupPalette[groupId];
+    tabElement.style.borderTop = `3px solid ${group.color}`;
+    tabElement.title = `${tab.title || tab.url} • Group: ${group.label}`;
   }
 
   /**
@@ -234,6 +297,27 @@ class VibeBrowserApp {
       if (!activeTabId) return;
 
       const resolvedUrl = await this.resolveInputToUrl(input);
+
+      if (resolvedUrl === 'vibebrowser://settings') {
+        await this.openSettingsTab();
+        return;
+      }
+
+      if (resolvedUrl === 'vibebrowser://bookmarks') {
+        await this.openBookmarksTab();
+        return;
+      }
+
+      if (resolvedUrl === 'vibebrowser://history') {
+        await this.openHistoryTab();
+        return;
+      }
+
+      if (resolvedUrl === 'vibebrowser://offline') {
+        await this.openOfflineTab();
+        return;
+      }
+
       window.electronAPI!.navigate.to(activeTabId, resolvedUrl);
       this.tabManager.updateTab(activeTabId, {
         url: resolvedUrl,
@@ -267,10 +351,29 @@ class VibeBrowserApp {
     this.tabManager.setUpdateCallback((tab) => {
       this.updateTabUI(tab);
       if (tab.id === this.tabManager.getActiveTabId()) {
-        this.toolbarManager.setUrl(tab.url);
+        this.toolbarManager.setUrl(this.formatUrlForAddressBar(tab.url));
         this.updateTrustRadar(tab.url);
       }
     });
+  }
+
+  private getInternalTabType(tabId: string): 'settings' | 'bookmarks' | 'history' | 'offline' | null {
+    const tabElement = document.getElementById(`ui-${tabId}`);
+    const tabType = tabElement?.getAttribute('data-tab-type');
+
+    if (tabType === 'settings' || tabType === 'bookmarks' || tabType === 'history' || tabType === 'offline') {
+      return tabType;
+    }
+
+    return null;
+  }
+
+  private formatUrlForAddressBar(url: string): string {
+    if (url === 'vibebrowser://settings') return 'VibeBrowser/Settings';
+    if (url === 'vibebrowser://bookmarks') return 'VibeBrowser/Bookmarks';
+    if (url === 'vibebrowser://history') return 'VibeBrowser/History';
+    if (url === 'vibebrowser://offline') return 'VibeBrowser/Offline';
+    return url;
   }
 
   /**
@@ -282,15 +385,31 @@ class VibeBrowserApp {
 
     // Titel-Änderungen
     window.electronAPI!.tabs.onTitleChanged((tabId, title) => {
+      if (title === '📴 VibeBrowser Offline') {
+        const tabElement = document.getElementById(`ui-${tabId}`);
+        if (tabElement) {
+          tabElement.setAttribute('data-tab-type', 'offline');
+        }
+      }
+
       this.tabManager.updateTab(tabId, { title, isLoading: false });
     });
 
     // URL-Änderungen
     window.electronAPI!.tabs.onUrlChanged((tabId, url) => {
-      this.tabManager.updateTab(tabId, { url, isLoading: false });
+      const internalTabType = this.getInternalTabType(tabId);
+      const isInternalRenderedPage =
+        !!internalTabType && (url.startsWith('data:text/html') || url === 'about:blank');
+
+      const nextUrl = isInternalRenderedPage
+        ? `vibebrowser://${internalTabType}`
+        : url;
+
+      this.tabManager.updateTab(tabId, { url: nextUrl, isLoading: false });
 
       if (tabId === this.tabManager.getActiveTabId()) {
-        this.updateTrustRadar(url);
+        this.toolbarManager.setUrl(this.formatUrlForAddressBar(nextUrl));
+        this.updateTrustRadar(nextUrl);
       }
     });
 
@@ -935,6 +1054,7 @@ class VibeBrowserApp {
         this.tabManager.addTab(tab);
         this.createTabUI(tabData.tabId);
         this.tabManager.switchTab(tabData.tabId);
+        window.electronAPI!.tabs.switch(tabData.tabId);
       }
     });
 
@@ -964,6 +1084,7 @@ class VibeBrowserApp {
     this.tabManager.addTab(tab);
     this.createTabUI(tabData.tabId);
     this.tabManager.switchTab(tabData.tabId);
+    window.electronAPI!.tabs.switch(tabData.tabId);
   }
 
   /**
@@ -1030,31 +1151,37 @@ class VibeBrowserApp {
   private setupEventListeners(): void {
     if (this.eventListenersSetup) return;
     this.eventListenersSetup = true;
-
-    this.newTabBtn?.addEventListener('click', () => {
-      this.handleNewTab();
-    });
   }
 
   /**
    * Neue Tab öffnen
    */
   private async handleNewTab(): Promise<void> {
-    const tabData = await window.electronAPI!.tabs.create();
-    console.log('New tab created:', tabData);
+    if (this.isCreatingNewTab) {
+      return;
+    }
 
-    const tab = {
-      id: tabData.tabId,
-      title: this.t('New tab', 'Neue Tab'),
-      url: tabData.url,
-      favicon: '',
-      isLoading: true,
-    };
+    this.isCreatingNewTab = true;
 
-    this.tabManager.addTab(tab);
-    this.createTabUI(tabData.tabId);
-    this.tabManager.switchTab(tabData.tabId);
-    window.electronAPI!.tabs.switch(tabData.tabId);
+    try {
+      const tabData = await window.electronAPI!.tabs.create();
+      console.log('New tab created:', tabData);
+
+      const tab = {
+        id: tabData.tabId,
+        title: this.t('New tab', 'Neue Tab'),
+        url: tabData.url,
+        favicon: '',
+        isLoading: true,
+      };
+
+      this.tabManager.addTab(tab);
+      this.createTabUI(tabData.tabId);
+      this.tabManager.switchTab(tabData.tabId);
+      window.electronAPI!.tabs.switch(tabData.tabId);
+    } finally {
+      this.isCreatingNewTab = false;
+    }
   }
 
   /**
@@ -1175,6 +1302,8 @@ class VibeBrowserApp {
     } else {
       tabElement.classList.remove('loading');
     }
+
+    this.applyTabGroupStyle(tab);
   }
 
   /**
@@ -1669,12 +1798,21 @@ class VibeBrowserApp {
   }
 
   private applyCustomBackground(imageDataUrl: string): void {
+    const safeImageUrl = imageDataUrl.replace(/"/g, '%22');
     const body = document.body;
-    body.style.backgroundImage = `linear-gradient(rgba(17,17,27,0.55), rgba(17,17,27,0.55)), url(${imageDataUrl})`;
+    body.style.backgroundImage = `linear-gradient(rgba(17,17,27,0.55), rgba(17,17,27,0.55)), url("${safeImageUrl}")`;
+    body.style.backgroundSize = 'cover';
+    body.style.backgroundPosition = 'center';
+    body.style.backgroundRepeat = 'no-repeat';
+    body.style.backgroundAttachment = 'fixed';
   }
 
   private clearCustomBackground(): void {
     document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundPosition = '';
+    document.body.style.backgroundRepeat = '';
+    document.body.style.backgroundAttachment = '';
   }
 
   private applyEditorModeCss(css: string): void {
@@ -1965,6 +2103,12 @@ class VibeBrowserApp {
     const trimmed = input.trim();
     if (!trimmed) return 'about:blank';
 
+    const normalizedInternalInput = trimmed.toLowerCase();
+    if (normalizedInternalInput === 'vibebrowser/offline') return 'vibebrowser://offline';
+    if (normalizedInternalInput === 'vibebrowser/settings') return 'vibebrowser://settings';
+    if (normalizedInternalInput === 'vibebrowser/bookmarks') return 'vibebrowser://bookmarks';
+    if (normalizedInternalInput === 'vibebrowser/history') return 'vibebrowser://history';
+
     if (this.isLikelyUrl(trimmed)) {
       if (
         trimmed.startsWith('http://') ||
@@ -2092,8 +2236,30 @@ class VibeBrowserApp {
 
     trustEl.style.display = 'block';
 
+    const isCustomBrowserSite = url.startsWith('vibebrowser://');
+    if (isCustomBrowserSite) {
+      trustEl.textContent = 'Trust CBS';
+      trustEl.setAttribute(
+        'title',
+        this.t(
+          'CBS = Custom Browser Site (trusted internal page, maximum trust)',
+          'CBS = Custom Browser Site (vertrauenswürdige interne Seite, maximaler Trust)'
+        )
+      );
+      trustEl.classList.remove('medium', 'risky');
+      trustEl.classList.add('good');
+      return;
+    }
+
     const score = this.calculateTrustScore(url);
     trustEl.textContent = `Trust ${score}`;
+    trustEl.setAttribute(
+      'title',
+      this.t(
+        'Trust score based on protocol, host and URL heuristics',
+        'Trust-Score basierend auf Protokoll, Host und URL-Heuristiken'
+      )
+    );
     trustEl.classList.remove('good', 'medium', 'risky');
 
     if (score >= 75) {
@@ -2146,9 +2312,146 @@ class VibeBrowserApp {
    * Create new tab (public for onclick handlers)
    */
   public createNewTab(): void {
-    const newTabBtn = document.getElementById('new-tab-btn');
-    if (newTabBtn) {
-      newTabBtn.click();
+    this.handleNewTab();
+  }
+
+  public cycleCurrentTabGroup(): void {
+    const activeTabId = this.tabManager.getActiveTabId();
+    if (!activeTabId) return;
+
+    const activeTab = this.tabManager.getTab(activeTabId);
+    if (!activeTab) return;
+
+    const host = this.getHostFromUrl(activeTab.url);
+    if (!host) {
+      alert(this.t('Tab groups are available only for website tabs.', 'Tab-Gruppen sind nur für Webseiten-Tabs verfügbar.'));
+      return;
+    }
+
+    const order = ['none', 'work', 'study', 'fun', 'media'];
+    const current = this.tabGroupAssignments[host] || 'none';
+    const currentIndex = order.indexOf(current);
+    const next = order[(currentIndex + 1) % order.length];
+
+    if (next === 'none') {
+      delete this.tabGroupAssignments[host];
+      alert(this.t(`Group removed for ${host}`, `Gruppe für ${host} entfernt`));
+    } else {
+      this.tabGroupAssignments[host] = next;
+      alert(this.t(`Assigned ${host} to ${this.tabGroupPalette[next].label}`, `${host} wurde Gruppe ${this.tabGroupPalette[next].label} zugewiesen`));
+    }
+
+    this.saveTabGroupAssignments();
+    this.tabManager.getAllTabs().forEach((tab) => this.applyTabGroupStyle(tab));
+  }
+
+  public quickSwitchGroup(): void {
+    const input = window.prompt(
+      this.t('Switch to group: work, study, fun, media', 'Zu Gruppe wechseln: work, study, fun, media'),
+      'work'
+    );
+
+    if (!input) return;
+
+    const normalized = input.trim().toLowerCase();
+    if (!this.tabGroupPalette[normalized]) {
+      alert(this.t('Unknown group.', 'Unbekannte Gruppe.'));
+      return;
+    }
+
+    const activeTabId = this.tabManager.getActiveTabId();
+    const targetTab = this.tabManager
+      .getAllTabs()
+      .find((tab) => tab.id !== activeTabId && this.getTabGroupForUrl(tab.url) === normalized);
+
+    if (!targetTab) {
+      alert(this.t('No tab found in that group.', 'Kein Tab in dieser Gruppe gefunden.'));
+      return;
+    }
+
+    this.tabManager.switchTab(targetTab.id);
+    window.electronAPI!.tabs.switch(targetTab.id);
+  }
+
+  public async saveWorkspaceSnapshot(): Promise<void> {
+    const tabs = this.tabManager
+      .getAllTabs()
+      .filter((tab) => !tab.url.startsWith('vibebrowser://') && !tab.url.startsWith('data:'))
+      .map((tab) => ({ url: tab.url, title: tab.title || tab.url }));
+
+    if (tabs.length === 0) {
+      alert(this.t('No web tabs to save.', 'Keine Webseiten-Tabs zum Speichern.'));
+      return;
+    }
+
+    const name = window.prompt(this.t('Workspace name:', 'Workspace-Name:'), `Workspace ${new Date().toLocaleString()}`);
+    if (!name || !name.trim()) return;
+
+    await window.electronAPI!.sessions.save(name.trim(), tabs);
+    alert(this.t('Workspace saved.', 'Workspace gespeichert.'));
+  }
+
+  public async switchWorkspace(): Promise<void> {
+    const sessions = (await window.electronAPI!.sessions.getAll()).filter((s: any) => s.name !== '__autosave__');
+    if (!sessions.length) {
+      alert(this.t('No saved workspaces yet.', 'Noch keine gespeicherten Workspaces vorhanden.'));
+      return;
+    }
+
+    const listing = sessions
+      .map((s: any, index: number) => `${index + 1}. ${s.name} (${s.tabs?.length || 0} tabs)`)
+      .join('\n');
+
+    const selected = window.prompt(
+      `${this.t('Select workspace number:', 'Workspace-Nummer auswählen:')}\n\n${listing}`,
+      '1'
+    );
+
+    if (!selected) return;
+
+    const index = Number(selected) - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= sessions.length) {
+      alert(this.t('Invalid workspace number.', 'Ungültige Workspace-Nummer.'));
+      return;
+    }
+
+    const chosen = sessions[index];
+    const shouldReplace = window.confirm(
+      this.t('Replace current tabs with selected workspace?', 'Aktuelle Tabs durch den ausgewählten Workspace ersetzen?')
+    );
+
+    if (shouldReplace) {
+      const currentTabs = [...this.tabManager.getAllTabs()];
+      currentTabs.forEach((tab) => {
+        const el = document.getElementById(`ui-${tab.id}`);
+        if (el) {
+          this.handleCloseTab(tab.id, el as HTMLElement);
+        }
+      });
+    }
+
+    let firstTabId: string | null = null;
+    for (const tabEntry of chosen.tabs || []) {
+      const tabData = await window.electronAPI!.tabs.create(tabEntry.url);
+      const newTab: TabData = {
+        id: tabData.tabId,
+        title: tabEntry.title || this.t('Loading...', 'Lädt...'),
+        url: tabEntry.url,
+        favicon: '',
+        isLoading: true,
+      };
+
+      this.tabManager.addTab(newTab);
+      this.createTabUI(tabData.tabId);
+
+      if (!firstTabId) {
+        firstTabId = tabData.tabId;
+      }
+    }
+
+    if (firstTabId) {
+      this.tabManager.switchTab(firstTabId);
+      window.electronAPI!.tabs.switch(firstTabId);
     }
   }
 
@@ -2301,6 +2604,58 @@ class VibeBrowserApp {
     }
   }
 
+  public async openOfflineTab(): Promise<void> {
+    if (this.isOpeningOfflineTab) {
+      return;
+    }
+
+    this.isOpeningOfflineTab = true;
+
+    try {
+      const existingOfflineTab = Array.from(document.querySelectorAll('.tab')).find(
+        tab => tab.getAttribute('data-tab-type') === 'offline'
+      );
+
+      if (existingOfflineTab) {
+        const tabId = existingOfflineTab.getAttribute('data-tab-id');
+        if (tabId) {
+          this.tabManager.switchTab(tabId);
+          window.electronAPI!.tabs.switch(tabId);
+          return;
+        }
+      }
+
+      const createdTab = await window.electronAPI!.tabs.create('about:blank');
+      const tabId = createdTab.tabId;
+
+      const tabData: TabData = {
+        id: tabId,
+        url: 'vibebrowser://offline',
+        title: this.t('📴 VibeBrowser Offline', '📴 VibeBrowser Offline'),
+        favicon: '',
+        isLoading: false
+      };
+
+      this.tabManager.addTab(tabData);
+      this.createTabUI(tabId);
+      this.tabManager.switchTab(tabId);
+      window.electronAPI!.tabs.switch(tabId);
+
+      const tabElement = document.getElementById(`ui-${tabId}`);
+      if (tabElement) {
+        tabElement.setAttribute('data-tab-type', 'offline');
+      }
+
+      await this.loadOfflineIntoTab(tabId);
+    } catch (error) {
+      console.error('[OFFLINE] ❌ ERROR:', error);
+      console.error('[OFFLINE] Error stack:', (error as Error).stack);
+      alert(this.t(`Error opening offline page: ${(error as Error).message}`, `Fehler beim Öffnen der Offline-Seite: ${(error as Error).message}`));
+    } finally {
+      this.isOpeningOfflineTab = false;
+    }
+  }
+
   /**
    * Load settings content into tab
    */
@@ -2326,6 +2681,293 @@ class VibeBrowserApp {
     await window.electronAPI!.navigate.to(tabId, `data:text/html;charset=utf-8,${encodeURIComponent(historyHTML)}`);
   }
 
+  private async loadOfflineIntoTab(tabId: string): Promise<void> {
+    const offlineHTML = this.generateOfflineHTML();
+    await window.electronAPI!.navigate.to(tabId, `data:text/html;charset=utf-8,${encodeURIComponent(offlineHTML)}`);
+  }
+
+  private generateOfflineHTML(): string {
+    return `
+      <!DOCTYPE html>
+      <html lang="de">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>📴 VibeBrowser Offline</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            min-height: 100vh;
+            padding: 32px;
+          }
+          .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+          }
+          .card {
+            background: #11111b;
+            border: 1px solid #313244;
+            border-radius: 12px;
+            padding: 20px;
+          }
+          h1 {
+            color: #89b4fa;
+            font-size: 30px;
+            margin-bottom: 8px;
+          }
+          .muted {
+            color: #a6adc8;
+            font-size: 14px;
+          }
+          .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+          }
+          button {
+            border: 0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-weight: 600;
+            background: #89b4fa;
+            color: #1e1e2e;
+          }
+          button.secondary {
+            background: #313244;
+            color: #cdd6f4;
+          }
+          textarea, input {
+            width: 100%;
+            margin-top: 10px;
+            border: 1px solid #585b70;
+            border-radius: 8px;
+            padding: 10px;
+            background: #313244;
+            color: #cdd6f4;
+          }
+          textarea { min-height: 120px; resize: vertical; }
+          ul { margin-top: 10px; list-style: none; display: grid; gap: 8px; }
+          li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #313244;
+            border-radius: 8px;
+            padding: 8px 10px;
+          }
+          .status {
+            margin-top: 6px;
+            font-weight: 600;
+            color: #94e2d5;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <h1>📴 VibeBrowser Offline</h1>
+            <p class="muted">Du bist gerade offline oder die Seite konnte nicht geladen werden. Diese Seite funktioniert komplett lokal.</p>
+            <p class="status" id="connection-status">Verbindungsstatus wird geprüft…</p>
+            <div class="row">
+              <button onclick="location.href='vibebrowser://retry'">Erneut versuchen</button>
+              <button class="secondary" onclick="location.reload()">Offline-Seite neu laden</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>📝 Offline Notizen</h2>
+            <p class="muted">Wird lokal im Browser gespeichert.</p>
+            <textarea id="offline-notes" placeholder="Schreibe hier deine Notizen für später..."></textarea>
+          </div>
+
+          <div class="card">
+            <h2>✅ Offline TODO</h2>
+            <p class="muted">Mini-Liste für Aufgaben ohne Internet.</p>
+            <input id="todo-input" placeholder="Neue Aufgabe hinzufügen..." />
+            <div class="row">
+              <button id="todo-add-btn">Aufgabe hinzufügen</button>
+            </div>
+            <ul id="todo-list"></ul>
+          </div>
+
+          <div class="card">
+            <h2>🎮 Offline Minigames</h2>
+            <p class="muted">Kleine Spiele ohne Internet.</p>
+            <div class="row" style="margin-top: 10px;">
+              <input id="guess-input" type="number" min="1" max="100" placeholder="Zahl von 1 bis 100" style="max-width: 220px; margin: 0;" />
+              <button id="guess-btn">Raten</button>
+              <button class="secondary" id="guess-reset-btn">Neu starten</button>
+            </div>
+            <p class="muted" id="guess-status" style="margin-top: 8px;">Errate die geheime Zahl.</p>
+            <div class="row" style="margin-top: 12px;">
+              <button class="secondary rps-btn" data-rps="rock">✊ Stein</button>
+              <button class="secondary rps-btn" data-rps="paper">✋ Papier</button>
+              <button class="secondary rps-btn" data-rps="scissors">✌ Schere</button>
+            </div>
+            <p class="muted" id="rps-status" style="margin-top: 8px;">Stein, Papier, Schere gegen den Browser.</p>
+          </div>
+        </div>
+
+        <script>
+          (function () {
+            const NOTES_KEY = 'vibebrowser-offline-notes';
+            const TODO_KEY = 'vibebrowser-offline-todos';
+            const notesEl = document.getElementById('offline-notes');
+            const todoInput = document.getElementById('todo-input');
+            const todoList = document.getElementById('todo-list');
+            const todoAddBtn = document.getElementById('todo-add-btn');
+            const connectionStatus = document.getElementById('connection-status');
+            const guessInput = document.getElementById('guess-input');
+            const guessBtn = document.getElementById('guess-btn');
+            const guessResetBtn = document.getElementById('guess-reset-btn');
+            const guessStatus = document.getElementById('guess-status');
+            const rpsStatus = document.getElementById('rps-status');
+            const rpsButtons = document.querySelectorAll('.rps-btn');
+            let secretNumber = Math.floor(Math.random() * 100) + 1;
+            let attempts = 0;
+
+            const updateConnection = () => {
+              const online = navigator.onLine;
+              connectionStatus.textContent = online
+                ? '✅ Verbindung erkannt. Du kannst oben auf „Erneut versuchen“ klicken.'
+                : '⚠️ Keine Internetverbindung erkannt.';
+              connectionStatus.style.color = online ? '#94e2d5' : '#f9e2af';
+            };
+
+            const loadTodos = () => {
+              try {
+                const raw = localStorage.getItem(TODO_KEY);
+                const items = raw ? JSON.parse(raw) : [];
+                return Array.isArray(items) ? items : [];
+              } catch {
+                return [];
+              }
+            };
+
+            const saveTodos = (items) => {
+              localStorage.setItem(TODO_KEY, JSON.stringify(items));
+            };
+
+            const renderTodos = () => {
+              const items = loadTodos();
+              todoList.innerHTML = '';
+
+              items.forEach((item, index) => {
+                const li = document.createElement('li');
+                const text = document.createElement('span');
+                text.textContent = item;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'Entfernen';
+                removeBtn.className = 'secondary';
+                removeBtn.addEventListener('click', () => {
+                  const next = loadTodos();
+                  next.splice(index, 1);
+                  saveTodos(next);
+                  renderTodos();
+                });
+
+                li.appendChild(text);
+                li.appendChild(removeBtn);
+                todoList.appendChild(li);
+              });
+            };
+
+            const addTodo = () => {
+              const value = todoInput.value.trim();
+              if (!value) return;
+              const items = loadTodos();
+              items.push(value);
+              saveTodos(items);
+              todoInput.value = '';
+              renderTodos();
+            };
+
+            const handleGuess = () => {
+              const value = Number(guessInput.value);
+              if (!Number.isFinite(value) || value < 1 || value > 100) {
+                guessStatus.textContent = 'Bitte eine Zahl zwischen 1 und 100 eingeben.';
+                return;
+              }
+
+              attempts += 1;
+              if (value === secretNumber) {
+                guessStatus.textContent = '🎉 Treffer! Versuche: ' + attempts;
+                return;
+              }
+
+              guessStatus.textContent = value < secretNumber ? 'Zu niedrig ⬇' : 'Zu hoch ⬆';
+            };
+
+            const resetGuess = () => {
+              secretNumber = Math.floor(Math.random() * 100) + 1;
+              attempts = 0;
+              guessInput.value = '';
+              guessStatus.textContent = 'Neues Spiel gestartet. Rate wieder von 1 bis 100.';
+            };
+
+            const pickRps = (choice) => {
+              const variants = ['rock', 'paper', 'scissors'];
+              const cpu = variants[Math.floor(Math.random() * variants.length)];
+              if (choice === cpu) {
+                rpsStatus.textContent = '🤝 Unentschieden (' + choice + ' vs ' + cpu + ')';
+                return;
+              }
+
+              const win =
+                (choice === 'rock' && cpu === 'scissors') ||
+                (choice === 'paper' && cpu === 'rock') ||
+                (choice === 'scissors' && cpu === 'paper');
+
+              rpsStatus.textContent = win
+                ? '✅ Gewonnen (' + choice + ' schlägt ' + cpu + ')'
+                : '❌ Verloren (' + cpu + ' schlägt ' + choice + ')';
+            };
+
+            notesEl.value = localStorage.getItem(NOTES_KEY) || '';
+            notesEl.addEventListener('input', () => {
+              localStorage.setItem(NOTES_KEY, notesEl.value);
+            });
+
+            todoAddBtn.addEventListener('click', addTodo);
+            guessBtn.addEventListener('click', handleGuess);
+            guessResetBtn.addEventListener('click', resetGuess);
+            rpsButtons.forEach((btn) => {
+              btn.addEventListener('click', () => pickRps(btn.getAttribute('data-rps')));
+            });
+            todoInput.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                addTodo();
+              }
+            });
+            guessInput.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                handleGuess();
+              }
+            });
+
+            window.addEventListener('online', updateConnection);
+            window.addEventListener('offline', updateConnection);
+
+            updateConnection();
+            renderTodos();
+          })();
+        </script>
+      </body>
+      </html>
+    `;
+  }
+
   /**
    * Generate Settings HTML
    */
@@ -2334,9 +2976,9 @@ class VibeBrowserApp {
     const themes = await window.electronAPI!.themes.getAll();
     const customCssPath = await window.electronAPI!.customCss.getPath();
     const adblockStats = await window.electronAPI!.adblock.getStats();
+    const dataSaverStats = await window.electronAPI!.dataSaver.getStats();
     const safeEditorModeCss = this.escapeHtml(settings.editorModeCss || '');
     const hasBackground = Boolean(settings.customBackgroundImage);
-    const serializedBackground = JSON.stringify(settings.customBackgroundImage || '');
     
     return `
       <!DOCTYPE html>
@@ -2444,6 +3086,21 @@ class VibeBrowserApp {
           </div>
 
           <div class="section">
+            <h2>Data Saver (Mobile Data)</h2>
+            <label>
+              <input type="checkbox" id="dataSaverEnabled" ${settings.dataSaverEnabled ? 'checked' : ''} />
+              Enable data saver mode
+            </label>
+            <p class="setting-desc">Blocks heavy resources (images/media/fonts) and known trackers to reduce internet data usage.</p>
+            <p class="setting-desc" id="data-saver-stats">
+              Allowed requests: ${dataSaverStats.allowedRequests} | Blocked: ${dataSaverStats.blockedRequests} |
+              Est. transferred: ${Math.round((dataSaverStats.estimatedTransferredBytes / (1024 * 1024)) * 100) / 100} MB |
+              Est. saved: ${Math.round((dataSaverStats.estimatedSavedBytes / (1024 * 1024)) * 100) / 100} MB
+            </p>
+            <button type="button" onclick="refreshDataSaverStats()">Refresh data stats</button>
+          </div>
+
+          <div class="section">
             <h2>Custom CSS</h2>
             <label>
               <input type="checkbox" id="customCssEnabled" ${settings.customCssEnabled ? 'checked' : ''} />
@@ -2493,13 +3150,28 @@ class VibeBrowserApp {
             <button type="button" onclick="checkForUpdatesNow()">Check for updates now</button>
           </div>
 
+          <div class="section">
+            <h2>Data Management</h2>
+            <p class="setting-desc">Reset settings or backup/restore settings, bookmarks and history.</p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" onclick="resetToDefaults()">Reset to defaults</button>
+              <button type="button" onclick="exportUserData()">Export data</button>
+              <button type="button" onclick="importUserData()">Import data</button>
+            </div>
+          </div>
+
           <button onclick="saveSettings()">Save</button>
         </div>
 
         <script>
-          let selectedBackgroundImage = ${serializedBackground};
+          let selectedBackgroundImage = '';
+          let backgroundReadPromise = null;
 
           async function saveSettings() {
+            if (backgroundReadPromise) {
+              await backgroundReadPromise;
+            }
+
             const current = await window.electronAPI.settings.get();
             const settings = {
               ...current,
@@ -2508,9 +3180,10 @@ class VibeBrowserApp {
               language: document.getElementById('language').value,
               theme: document.getElementById('theme').value,
               adblockEnabled: document.getElementById('adblockEnabled').checked,
+              dataSaverEnabled: document.getElementById('dataSaverEnabled').checked,
               customCssEnabled: document.getElementById('customCssEnabled').checked,
               customBackgroundEnabled: document.getElementById('customBackgroundEnabled').checked,
-              customBackgroundImage: selectedBackgroundImage,
+              customBackgroundImage: selectedBackgroundImage || current.customBackgroundImage || '',
               editorModeCss: document.getElementById('editorModeCss').value,
               trustRadarEnabled: document.getElementById('trustRadarEnabled').checked
             };
@@ -2539,6 +3212,84 @@ class VibeBrowserApp {
             alert('Error: update check unavailable.');
           }
 
+          async function resetToDefaults() {
+            if (!window.electronAPI || !window.electronAPI.settings || !window.electronAPI.settings.resetToDefaults) {
+              alert('Error: reset unavailable.');
+              return;
+            }
+
+            const confirmed = confirm('Reset settings to defaults?');
+            if (!confirmed) return;
+
+            const result = await window.electronAPI.settings.resetToDefaults();
+            if (result && result.success) {
+              alert('Settings reset to defaults. Re-open settings to see all default values.');
+            } else {
+              alert('Reset failed.');
+            }
+          }
+
+          async function exportUserData() {
+            if (!window.electronAPI || !window.electronAPI.settings || !window.electronAPI.settings.exportUserData) {
+              alert('Error: export unavailable.');
+              return;
+            }
+
+            const result = await window.electronAPI.settings.exportUserData();
+            if (result && result.success) {
+              alert('Data export completed.');
+              return;
+            }
+
+            if (result && result.cancelled) {
+              return;
+            }
+
+            alert('Export failed.');
+          }
+
+          async function importUserData() {
+            if (!window.electronAPI || !window.electronAPI.settings || !window.electronAPI.settings.importUserData) {
+              alert('Error: import unavailable.');
+              return;
+            }
+
+            const confirmed = confirm('Import data from backup? Existing settings/bookmarks/history will be overwritten.');
+            if (!confirmed) return;
+
+            const result = await window.electronAPI.settings.importUserData();
+            if (result && result.success) {
+              alert('Data import completed. Re-open settings to refresh values.');
+              return;
+            }
+
+            if (result && result.cancelled) {
+              return;
+            }
+
+            alert('Import failed.');
+          }
+
+          function formatMB(bytes) {
+            return (Math.round((bytes / (1024 * 1024)) * 100) / 100).toFixed(2);
+          }
+
+          async function refreshDataSaverStats() {
+            if (!window.electronAPI || !window.electronAPI.dataSaver) {
+              return;
+            }
+
+            const stats = await window.electronAPI.dataSaver.getStats();
+            const el = document.getElementById('data-saver-stats');
+            if (!el) return;
+
+            el.textContent =
+              'Allowed requests: ' + stats.allowedRequests +
+              ' | Blocked: ' + stats.blockedRequests +
+              ' | Est. transferred: ' + formatMB(stats.estimatedTransferredBytes) + ' MB' +
+              ' | Est. saved: ' + formatMB(stats.estimatedSavedBytes) + ' MB';
+          }
+
           function previewEditorModeCss() {
             const css = document.getElementById('editorModeCss').value;
             let styleEl = document.getElementById('editor-preview-style');
@@ -2556,13 +3307,24 @@ class VibeBrowserApp {
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = () => {
-              selectedBackgroundImage = typeof reader.result === 'string' ? reader.result : '';
-            };
+            backgroundReadPromise = new Promise((resolve) => {
+              reader.onload = () => {
+                selectedBackgroundImage = typeof reader.result === 'string' ? reader.result : '';
+                resolve(null);
+              };
+
+              reader.onerror = () => {
+                selectedBackgroundImage = '';
+                alert('Could not read selected image.');
+                resolve(null);
+              };
+            });
+
             reader.readAsDataURL(file);
           });
 
           previewEditorModeCss();
+          refreshDataSaverStats();
         </script>
       </body>
       </html>

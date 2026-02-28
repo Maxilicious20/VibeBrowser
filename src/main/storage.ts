@@ -29,6 +29,7 @@ export interface Bookmark {
 
 export interface AppSettings {
   language?: 'en' | 'de';
+  dataSaverEnabled?: boolean;
   homepage: string;
   searchEngine: string;
   theme: string;
@@ -62,6 +63,27 @@ export class StorageManager {
     this.ensureFiles();
   }
 
+  private createDefaultSettings(): AppSettings {
+    return {
+      language: 'en',
+      dataSaverEnabled: false,
+      homepage: 'https://www.google.com',
+      searchEngine: 'https://www.google.com/search?q=',
+      theme: 'catppuccin-mocha',
+      adblockEnabled: true,
+      customCssEnabled: false,
+      customBackgroundEnabled: false,
+      customBackgroundImage: '',
+      editorModeCss: '',
+      trustRadarEnabled: true,
+      lastSeenVersion: '1.2.1',
+      privateMode: false,
+      splitViewEnabled: false,
+      splitOrientation: 'vertical',
+      downloadPath: app.getPath('downloads'),
+    };
+  }
+
   /**
    * Ensure all storage files exist
    */
@@ -76,23 +98,7 @@ export class StorageManager {
       fs.writeFileSync(this.bookmarksFilePath, '[]', 'utf-8');
     }
     if (!fs.existsSync(this.settingsFilePath)) {
-      const defaultSettings: AppSettings = {
-        language: 'en',
-        homepage: 'https://www.google.com',
-        searchEngine: 'https://www.google.com/search?q=',
-        theme: 'catppuccin-mocha',
-        adblockEnabled: true,
-        customCssEnabled: false,
-        customBackgroundEnabled: false,
-        customBackgroundImage: '',
-        editorModeCss: '',
-        trustRadarEnabled: true,
-        lastSeenVersion: '1.2.1',
-        privateMode: false,
-        splitViewEnabled: false,
-        splitOrientation: 'vertical',
-        downloadPath: app.getPath('downloads'),
-      };
+      const defaultSettings: AppSettings = this.createDefaultSettings();
       fs.writeFileSync(
         this.settingsFilePath,
         JSON.stringify(defaultSettings, null, 2),
@@ -314,21 +320,44 @@ export class StorageManager {
     } catch (error) {
       console.error('[StorageManager] Error loading settings:', error);
       return {
-        language: 'en',
-        homepage: 'https://www.google.com',
-        searchEngine: 'https://www.google.com/search?q=',
-        theme: 'catppuccin-mocha',
-        adblockEnabled: true,
-        customCssEnabled: false,
-        customBackgroundEnabled: false,
-        customBackgroundImage: '',
-        editorModeCss: '',
-        trustRadarEnabled: true,
-        privateMode: false,
-        splitViewEnabled: false,
-        splitOrientation: 'vertical',
-        downloadPath: app.getPath('downloads'),
+        ...this.createDefaultSettings(),
       };
+    }
+  }
+
+  resetSettingsToDefaults(): AppSettings {
+    const defaults = this.createDefaultSettings();
+    this.saveSettings(defaults);
+    return defaults;
+  }
+
+  exportUserData(): { settings: AppSettings; bookmarks: Bookmark[]; history: HistoryItem[] } {
+    return {
+      settings: this.loadSettings(),
+      bookmarks: this.loadBookmarks(),
+      history: this.loadHistory(),
+    };
+  }
+
+  importUserData(data: {
+    settings?: Partial<AppSettings>;
+    bookmarks?: Bookmark[];
+    history?: HistoryItem[];
+  }): void {
+    if (Array.isArray(data.bookmarks)) {
+      fs.writeFileSync(this.bookmarksFilePath, JSON.stringify(data.bookmarks, null, 2), 'utf-8');
+    }
+
+    if (Array.isArray(data.history)) {
+      fs.writeFileSync(this.historyFilePath, JSON.stringify(data.history, null, 2), 'utf-8');
+    }
+
+    if (data.settings) {
+      const merged = {
+        ...this.createDefaultSettings(),
+        ...data.settings,
+      } as AppSettings;
+      this.saveSettings(merged);
     }
   }
 }
