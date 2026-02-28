@@ -76,7 +76,7 @@ export class StorageManager {
       customBackgroundImage: '',
       editorModeCss: '',
       trustRadarEnabled: true,
-      lastSeenVersion: '1.2.1',
+      lastSeenVersion: '1.3.0',
       privateMode: false,
       splitViewEnabled: false,
       splitOrientation: 'vertical',

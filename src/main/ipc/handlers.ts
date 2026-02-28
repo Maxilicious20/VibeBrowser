@@ -348,20 +348,20 @@ export class IpcHandlerManager {
         if (fs.existsSync(packageDataPath)) {
           const packageData = JSON.parse(fs.readFileSync(packageDataPath, 'utf-8'));
           return {
-            version: packageData.version || '1.2.1',
+            version: packageData.version || '1.3.0',
             githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
           };
         }
         
         // Fallback
         return {
-          version: '1.2.1',
+          version: '1.3.0',
           githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
         };
       } catch (error) {
         console.error('Error reading app info:', error);
         return {
-          version: '1.2.1',
+          version: '1.3.0',
           githubRepo: 'https://github.com/Maxilicious20/VibeBrowser/blob/main/CHANGELOG.md',
         };
       }

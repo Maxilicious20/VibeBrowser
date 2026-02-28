@@ -2,6 +2,69 @@
 
 Alle wichtigen Änderungen des Projekts sind in dieser Datei dokumentiert.
 
+## [1.3.0] - 2026-02-28
+
+### 📋 What's Included in This Release
+
+### ✨ New Features
+
+#### 🗂 Workspaces & Tab Groups
+- Persistente Tab-Gruppen mit Farbcodierung (Work / Study / Fun / Media)
+- Quick Group Switch direkt aus der Toolbar
+- Workspace Snapshot speichern und später wiederherstellen
+- Workspace-Wechsel mit optionalem Ersetzen der aktuellen Tabs
+
+#### ⚙ Settings Data Management
+- „Reset to defaults“ direkt in den Settings
+- Export von Settings + Bookmarks + History als JSON-Backup
+- Import von Backups mit automatischer Anwendung der geladenen Einstellungen
+
+#### 📴 Offline Mode Upgrade
+- Offline-Seite mit lokalen Notizen + TODO-Liste weiter ausgebaut
+- Neue Offline-Minigames integriert:
+  - Zahlenraten (1–100)
+  - Stein / Papier / Schere
+
+### 🐛 Bug Fixes
+
+#### Critical Fixes
+✅ Download-Menü in der Topbar wieder dauerhaft sichtbar gemacht
+✅ Tab-Erstellung über Drag&Drop wechselt jetzt korrekt auch den Main BrowserView
+✅ Offline-URL-Mapping robuster gemacht (nur echte Offline-Datenseite wird intern gemappt)
+
+#### Important Fixes
+✅ Neuer Tab / Offline-Tab gegen Doppel-Auslösung abgesichert
+✅ Hintergrundbild-Anwendung stabilisiert (korrektes Cover/Center/Repeat/Attachment)
+✅ Race beim Bild-Upload in den Settings behoben (Save wartet auf FileReader)
+
+### ⚡ Performance Improvements
+
+#### Toolbar & Rendering
+- Toolbar-Layout für viele Buttons optimiert, ohne Download-UI zu verlieren
+- Zusätzliche Toolbar-Aktionen auf kleineren Breiten intelligent ausgeblendet
+
+### 📋 Technical Changes
+
+#### Updated Files
+- `src/renderer/app.ts`
+- `src/renderer/index.html`
+- `src/styles/vibe.css`
+- `src/main/browser-view.ts`
+- `src/main/ipc/handlers.ts`
+- `src/main/storage.ts`
+- `src/preload/preload.ts`
+- `src/common/types.ts`
+- `package.json`
+
+### 📦 Build Artifacts (v1.3.0)
+
+#### Ready to Distribute
+✅ `release/VibeBrowser 1.3.0.exe`
+✅ `release/VibeBrowser-1.3.0.exe`
+✅ `release/VibeBrowser-v1.3.0-win64.zip`
+
+---
+
 ## [1.2.1] - 2026-02-27
 
 ### 📋 What's Included in This Release
