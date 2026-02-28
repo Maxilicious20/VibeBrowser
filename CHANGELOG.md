@@ -4,6 +4,8 @@ Alle wichtigen Änderungen des Projekts sind in dieser Datei dokumentiert.
 
 ## [1.4.0] - 2026-02-28 (Pre-Release)
 
+### 📋 What's Included in This Release
+
 ### ✨ Highlights
 
 #### 📥 Download Center Upgrade

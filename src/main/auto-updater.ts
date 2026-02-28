@@ -17,6 +17,10 @@ export class AutoUpdateManager {
   private readonly forceDevUpdates: boolean = process.env.VIBE_FORCE_DEV_UPDATES === '1';
   private lastCheckWasManual: boolean = false;
 
+  private isPortableBuild(): boolean {
+    return Boolean(process.env.PORTABLE_EXECUTABLE_FILE);
+  }
+
   private onCheckingForUpdate = () => {
     console.log('[AutoUpdater] Checking for updates...');
   };
@@ -164,6 +168,22 @@ export class AutoUpdateManager {
    */
   public checkForUpdates(manual: boolean = false): void {
     this.lastCheckWasManual = manual;
+
+    if (this.isPortableBuild() && !this.forceDevUpdates) {
+      console.log('[AutoUpdater] Skipping update check for portable build');
+
+      if (manual) {
+        dialog.showMessageBox(this.mainWindow, {
+          type: 'info',
+          title: 'Update check unavailable',
+          message: 'Automatic update checks are disabled in portable mode.',
+          detail: 'Download the newest portable .exe from GitHub Releases manually, or use an NSIS installer build for full auto-update support.',
+          buttons: ['OK'],
+          defaultId: 0,
+        });
+      }
+      return;
+    }
 
     if (process.env.NODE_ENV === 'development' && !this.forceDevUpdates) {
       console.log('[AutoUpdater] Skipping update check in development mode');
